@@ -1,5 +1,14 @@
-// https://nuxt.com/docs/api/configuration/nuxt-config
+import { defineNuxtConfig } from 'nuxt/config'
+
 export default defineNuxtConfig({
-  compatibilityDate: '2025-07-15',
-  devtools: { enabled: true }
+  ssr: false,
+  modules: [
+    '@vueuse/nuxt',
+    '@vueuse/motion/nuxt'
+  ],
+  css: ['~/assets/css/main.css'],
+  compatibilityDate: '2024-04-03',
+  app: {
+    pageTransition: { name: 'page', mode: 'out-in' }
+  }
 })
