@@ -1,9 +1,9 @@
-import { db } from '../../../server/db';
-import { users } from '../../../server/db/schema';
+import { db } from '../../db';
+import { users } from '../../db/schema';
 import { eq, or } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
-import { signToken } from '../../../server/utils/jwt';
+import { signToken } from '../../utils/jwt';
 
 const loginSchema = z.object({
   identifier: z.string().min(1, 'Username or email is required.'),
@@ -52,6 +52,24 @@ export default defineEventHandler(async (event) => {
         statusCode: 403, 
         statusMessage: 'Please verify your account (email address) before logging in.' 
       });
+    }
+
+    if (user.twoFactorEnabled) {
+      // 2FA requires an intermediate state
+      const tempToken = signToken({ pendingUserId: user.id }, '15m');
+      
+      setCookie(event, 'auth_pending_2fa', tempToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 15, // 15 mins
+        path: '/'
+      });
+
+      return {
+        success: true,
+        require2fa: true,
+        message: '2FA verification required'
+      };
     }
 
     // JWT Token oluşturma

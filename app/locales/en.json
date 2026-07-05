@@ -22,7 +22,18 @@
     "forgotPassword": "Forgot Password?",
     "createAccount": "Create Account",
     "successMessage": "Successfully logged in!",
-    "errorMessage": "Login failed."
+    "errorMessage": "Login failed.",
+    "2fa": {
+      "title": "Two-Factor Authentication",
+      "subtitle": "Enter the 6-digit code from your authenticator app",
+      "codeLabel": "Verification Code",
+      "verify": "Verify",
+      "verifying": "Verifying..."
+    },
+    "passkey": {
+      "signIn": "Sign in with Passkey",
+      "notSupported": "Passkeys are not supported on this device"
+    }
   },
   "register": {
     "title": "Nuxt Auth",
@@ -81,11 +92,13 @@
       "title": "Nuxt Auth",
       "myProfile": "My Profile",
       "settings": "Settings",
+      "security": "Security",
       "logout": "Log Out"
     },
     "header": {
       "dashboard": "Dashboard",
-      "settings": "Settings"
+      "settings": "Settings",
+      "security": "Security"
     },
     "profile": {
       "welcome": "Welcome, {name}!",
@@ -94,6 +107,28 @@
       "email": "Email Address",
       "accountStatus": "Account Status",
       "active": "Active"
+    },
+    "security": {
+      "title": "Security Settings",
+      "description": "Manage your Two-Factor Authentication and Passkeys for enhanced security.",
+      "2fa": {
+        "title": "Two-Factor Authentication",
+        "enable": "Enable 2FA",
+        "disable": "Disable 2FA",
+        "scanQr": "Scan this QR code with your authenticator app",
+        "enterCode": "Enter the 6-digit code from the app to confirm",
+        "confirm": "Confirm & Enable",
+        "confirming": "Enabling...",
+        "enterPasswordToDisable": "Enter your password to disable 2FA",
+        "password": "Password",
+        "disabling": "Disabling..."
+      },
+      "passkey": {
+       "title": "Passkeys",
+       "description": "Sign in securely with your fingerprint, face, or screen lock.",
+       "add": "Add Passkey",
+       "adding": "Adding..."
+      }
     },
     "settings": {
       "title": "Account Settings",

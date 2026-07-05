@@ -3,13 +3,14 @@ import { useRouter } from 'nuxt/app'
 import { ref, onMounted } from 'vue'
 import { useToast } from '~/composables/useToast'
 import { useTranslation } from '~/composables/useTranslation'
+import { startRegistration } from '@simplewebauthn/browser'
 
 const router = useRouter()
 const { showSuccess, showError } = useToast()
 const { t } = useTranslation()
 
 const isMenuOpen = ref(false)
-const currentTab = ref('profile') // 'profile' veya 'settings'
+const currentTab = ref('profile') // 'profile', 'settings' veya 'security'
 const user = ref(null)
 const isLoading = ref(true)
 
@@ -18,11 +19,18 @@ const currentPassword = ref('')
 const newPassword = ref('')
 const newEmail = ref('')
 const updateType = ref('') // 'password' veya 'email'
-const verificationStep = ref(false) // Kod girme adımında mıyız?
+const verificationStep = ref(false)
 const oldEmailCode = ref('')
 const newEmailCode = ref('')
 const passCode = ref('')
 const isActionLoading = ref(false)
+
+// Security Formları İçin Değişkenler
+const qrCodeUrl = ref('')
+const twoFactorSecretCode = ref('')
+const twoFactorInputCode = ref('')
+const passwordToDisable2fa = ref('')
+const passkeys = ref([])
 
 const fetchProfile = async () => {
   try {
@@ -58,6 +66,16 @@ const resetForms = () => {
   passCode.value = ''
   updateType.value = ''
   verificationStep.value = false
+  
+  qrCodeUrl.value = ''
+  twoFactorSecretCode.value = ''
+  twoFactorInputCode.value = ''
+  passwordToDisable2fa.value = ''
+}
+
+const changeTab = (tab) => {
+    currentTab.value = tab;
+    resetForms();
 }
 
   const requestUpdate = async (type) => {
@@ -109,13 +127,102 @@ const confirmUpdate = async () => {
     
     showSuccess(res.message)
     resetForms()
-    fetchProfile() // Bilgileri yeniden çek
+    fetchProfile()
   } catch (err) {
     showError(err.data?.statusMessage || t('dashboard.messages.incorrectCode'))
   } finally {
     isActionLoading.value = false
   }
 }
+
+// 2FA Methods
+const generate2fa = async () => {
+    isActionLoading.value = true;
+    try {
+        const res = await $fetch('/api/auth/2fa/generate', { method: 'POST' });
+        qrCodeUrl.value = res.qrCodeDataUrl;
+        twoFactorSecretCode.value = res.secret;
+    } catch (error) {
+         showError(error.data?.statusMessage || 'Failed to generate 2FA');
+    } finally {
+        isActionLoading.value = false;
+    }
+}
+
+const enable2fa = async () => {
+    if(!twoFactorInputCode.value || twoFactorInputCode.value.length !== 6) return showError("Please enter the 6-digit code.");
+    isActionLoading.value = true;
+    try {
+        const res = await $fetch('/api/auth/2fa/verify', { 
+            method: 'POST',
+            body: { code: twoFactorInputCode.value }
+        });
+        showSuccess(res.message);
+        user.value.twoFactorEnabled = true;
+        resetForms();
+    } catch (error) {
+        showError(error.data?.statusMessage || 'Invalid code');
+    } finally {
+        isActionLoading.value = false;
+    }
+}
+
+const disable2fa = async () => {
+    if(!passwordToDisable2fa.value) return showError("Please enter your password.");
+    isActionLoading.value = true;
+    try {
+        const res = await $fetch('/api/auth/2fa/disable', { 
+            method: 'POST',
+            body: { password: passwordToDisable2fa.value }
+        });
+        showSuccess(res.message);
+        user.value.twoFactorEnabled = false;
+        resetForms();
+    } catch (error) {
+        showError(error.data?.statusMessage || 'Failed to disable 2FA');
+    } finally {
+        isActionLoading.value = false;
+    }
+}
+
+// Passkey Methods
+const registerPasskey = async () => {
+    isActionLoading.value = true;
+    try {
+        const optionsResp = await $fetch('/api/auth/passkey/generate-registration-options', { method: 'POST' });
+        
+        let attResp;
+        try {
+            attResp = await startRegistration(optionsResp);
+        } catch (error) {
+            if (error.name === 'InvalidStateError') {
+                showError('Authenticator was probably already registered by user');
+            } else if (error.name === 'NotAllowedError') {
+                 // User cancelled
+                 return;
+            } else {
+                 showError('Registration failed locally');
+            }
+            return;
+        }
+
+        const verificationResp = await $fetch('/api/auth/passkey/verify-registration', { 
+            method: 'POST',
+            body: attResp
+        });
+        
+        if(verificationResp && verificationResp.verified) {
+             showSuccess('Passkey registered successfully!');
+             // Ideally refetch user/passkeys list here if we display them
+        }
+        
+    } catch (error) {
+         showError(error.data?.statusMessage || error.message || 'Passkey registration failed');
+    } finally {
+        isActionLoading.value = false;
+    }
+}
+
 </script>
 
 <template>
@@ -125,8 +232,9 @@ const confirmUpdate = async () => {
         <h2>{{ t('dashboard.sidebar.title') }}</h2>
       </div>
       <nav class="sidebar-nav">
-        <a href="#" :class="{ active: currentTab === 'profile' }" @click.prevent="currentTab = 'profile'; resetForms()">{{ t('dashboard.sidebar.myProfile') }}</a>
-        <a href="#" :class="{ active: currentTab === 'settings' }" @click.prevent="currentTab = 'settings'">{{ t('dashboard.sidebar.settings') }}</a>
+        <a href="#" :class="{ active: currentTab === 'profile' }" @click.prevent="changeTab('profile')">{{ t('dashboard.sidebar.myProfile') }}</a>
+        <a href="#" :class="{ active: currentTab === 'settings' }" @click.prevent="changeTab('settings')">{{ t('dashboard.sidebar.settings') }}</a>
+        <a href="#" :class="{ active: currentTab === 'security' }" @click.prevent="changeTab('security')">{{ t('dashboard.sidebar.security') }}</a>
       </nav>
       <div class="sidebar-footer">
         <button @click="logout" class="btn btn-text" style="color: var(--md-error); width: 100%; text-align: left;">{{ t('dashboard.sidebar.logout') }}</button>
@@ -138,7 +246,7 @@ const confirmUpdate = async () => {
         <button class="menu-btn" @click="isMenuOpen = !isMenuOpen">
           <span class="menu-icon"></span>
         </button>
-        <div class="app-bar-title">{{ currentTab === 'profile' ? t('dashboard.header.dashboard') : t('dashboard.header.settings') }}</div>
+        <div class="app-bar-title">{{ currentTab === 'profile' ? t('dashboard.header.dashboard') : currentTab === 'settings' ? t('dashboard.header.settings') : t('dashboard.header.security') }}</div>
         <div class="app-bar-actions">
           <div class="avatar">{{ user.username.charAt(0).toUpperCase() }}</div>
         </div>
@@ -248,6 +356,79 @@ const confirmUpdate = async () => {
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="verificationStep || isActionLoading">{{ t('dashboard.settings.sendCode') }}</button>
               </form>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- GÜVENLİK SEKME -->
+        <div v-if="currentTab === 'security'" v-motion :initial="{opacity:0}" :enter="{opacity:1}">
+          <h1>{{ t('dashboard.security.title') }}</h1>
+          <p style="color: var(--md-on-bg-medium); margin-bottom: 32px;">{{ t('dashboard.security.description') }}</p>
+          
+          <div class="settings-grid">
+            <!-- 2FA Kartı -->
+            <div class="card settings-card">
+              <h3>{{ t('dashboard.security.2fa.title') }}</h3>
+              
+              <!-- 2FA is currently DISABLED -->
+              <div v-if="!user.twoFactorEnabled">
+                  <div v-if="!qrCodeUrl">
+                      <p style="font-size: 14px; margin-bottom: 16px; color: var(--md-on-bg-medium);">Add an extra layer of security to your account.</p>
+                      <button type="button" class="btn btn-primary" @click="generate2fa" :disabled="isActionLoading">
+                          <span v-if="!isActionLoading">{{ t('dashboard.security.2fa.enable') }}</span>
+                          <span v-else>...</span>
+                      </button>
+                  </div>
+                  <div v-else>
+                      <p style="font-size: 14px; margin-bottom: 16px;">{{ t('dashboard.security.2fa.scanQr') }}</p>
+                      <div style="background: white; padding: 16px; border-radius: 8px; display: inline-block; margin-bottom: 16px;">
+                          <img :src="qrCodeUrl" alt="QR Code" style="display: block; width: 150px; height: 150px;" />
+                      </div>
+                      <p style="font-size: 14px; margin-bottom: 16px; color: var(--md-on-bg-medium);">{{ t('dashboard.security.2fa.enterCode') }}</p>
+                      <form @submit.prevent="enable2fa">
+                          <div class="input-group">
+                            <input type="text" id="twoFactorInputCode" v-model="twoFactorInputCode" placeholder=" " maxlength="6" required />
+                            <label for="twoFactorInputCode">Code</label>
+                          </div>
+                          <div style="display:flex; gap: 12px;">
+                            <button type="button" class="btn btn-text" @click="resetForms">{{ t('dashboard.settings.cancel') }}</button>
+                            <button type="submit" class="btn btn-primary" style="flex:1" :disabled="isActionLoading">
+                              <span v-if="!isActionLoading">{{ t('dashboard.security.2fa.confirm') }}</span>
+                              <span v-else>{{ t('dashboard.security.2fa.confirming') }}</span>
+                            </button>
+                          </div>
+                      </form>
+                  </div>
+              </div>
+
+              <!-- 2FA is currently ENABLED -->
+              <div v-else>
+                  <p style="font-size: 14px; margin-bottom: 16px; color: var(--md-secondary);">Two-Factor Authentication is currently active.</p>
+                  <p style="font-size: 14px; margin-bottom: 16px; color: var(--md-on-bg-medium);">{{ t('dashboard.security.2fa.enterPasswordToDisable') }}</p>
+                  
+                  <form @submit.prevent="disable2fa">
+                      <div class="input-group">
+                        <input type="password" id="passwordToDisable2fa" v-model="passwordToDisable2fa" placeholder=" " required />
+                        <label for="passwordToDisable2fa">{{ t('dashboard.security.2fa.password') }}</label>
+                      </div>
+                      <button type="submit" class="btn" style="background-color: var(--md-error); color: white; border: none; width: 100%" :disabled="isActionLoading">
+                          <span v-if="!isActionLoading">{{ t('dashboard.security.2fa.disable') }}</span>
+                          <span v-else>{{ t('dashboard.security.2fa.disabling') }}</span>
+                      </button>
+                  </form>
+              </div>
+            </div>
+
+            <!-- Passkey Kartı -->
+            <div class="card settings-card">
+              <h3>{{ t('dashboard.security.passkey.title') }}</h3>
+              <p style="font-size: 14px; margin-bottom: 16px; color: var(--md-on-bg-medium);">{{ t('dashboard.security.passkey.description') }}</p>
+              
+              <button type="button" class="btn btn-primary" @click="registerPasskey" :disabled="isActionLoading">
+                  <span v-if="!isActionLoading">{{ t('dashboard.security.passkey.add') }}</span>
+                  <span v-else>{{ t('dashboard.security.passkey.adding') }}</span>
+              </button>
             </div>
 
           </div>
