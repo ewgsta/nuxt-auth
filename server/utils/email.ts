@@ -1,6 +1,6 @@
 export const sendEmail = async (to: string, subject: string, html: string, text?: string) => {
   const EMAILTHING_TOKEN = process.env.EMAILTHING_TOKEN;
-  const EMAILTHING_FROM = process.env.EMAILTHING_FROM || 'no-reply@yourdomain.com';
+  const EMAILTHING_FROM = process.env.EMAILTHING_FROM;
 
   if (!EMAILTHING_TOKEN) {
     console.warn('EMAILTHING_TOKEN is not defined in environment variables. Email will not be sent.');

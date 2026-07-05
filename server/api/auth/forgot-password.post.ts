@@ -1,9 +1,9 @@
-import { db } from '~/server/db';
-import { users } from '~/server/db/schema';
+import { db } from '../../db';
+import { users } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
-import { sendEmail } from '~/server/utils/email';
+import { sendEmail } from '../../utils/email';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Geçerli bir e-posta adresi giriniz.'),

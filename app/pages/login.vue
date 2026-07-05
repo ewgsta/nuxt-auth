@@ -1,26 +1,28 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'nuxt/app'
+import { useToast } from '~/composables/useToast'
 
 const router = useRouter()
+const { showSuccess, showError } = useToast()
+
 const identifier = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const isLoading = ref(false)
 
-const errorMsg = ref('')
-
 const login = async () => {
   isLoading.value = true
-  errorMsg.value = ''
   try {
     await $fetch('/api/auth/login', {
       method: 'POST',
       body: { identifier: identifier.value, password: password.value }
     })
+    
+    showSuccess('Başarıyla giriş yaptınız!')
     router.push('/dashboard')
   } catch (err) {
-    errorMsg.value = err.data?.statusMessage || 'Giriş işlemi başarısız oldu.'
+    showError(err.data?.statusMessage || 'Giriş işlemi başarısız oldu.')
   } finally {
     isLoading.value = false
   }
@@ -35,10 +37,6 @@ const login = async () => {
         <p>Hesabınıza giriş yapın</p>
       </div>
 
-      <div v-if="errorMsg" style="color: var(--md-error); font-size: 14px; text-align: center; margin-bottom: 16px;">
-        {{ errorMsg }}
-      </div>
-      
       <form @submit.prevent="login">
         <div class="input-group">
           <input type="text" id="identifier" v-model="identifier" placeholder=" " required />

@@ -1,5 +1,5 @@
-import { db } from '~/server/db';
-import { users } from '~/server/db/schema';
+import { db } from '../../db';
+import { users } from '../../db/schema';
 import { eq, gt, and } from 'drizzle-orm';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';

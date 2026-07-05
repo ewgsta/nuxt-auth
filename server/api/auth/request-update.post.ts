@@ -1,9 +1,9 @@
-import { db } from '~/server/db';
-import { users } from '~/server/db/schema';
+import { db } from '../../db';
+import { users } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
-import { sendEmail } from '~/server/utils/email';
+import { sendEmail } from '../../utils/email';
 
 const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
