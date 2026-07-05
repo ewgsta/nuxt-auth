@@ -29,14 +29,32 @@ const passwordStrength = computed(() => {
   return { score: 0, text: 'Çok Zayıf', colors: ['var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)'] }
 })
 
+const errorMsg = ref('')
+
 const register = async () => {
   if (!acceptTerms.value) return alert("Şartları kabul etmelisiniz.")
   if (passwordStrength.value.score < 2) return alert("Şifreniz çok zayıf. Lütfen daha güçlü bir şifre seçin.")
   
   isLoading.value = true
-  await new Promise(r => setTimeout(r, 1200))
-  isLoading.value = false
-  router.push('/login')
+  errorMsg.value = ''
+  
+  try {
+    await $fetch('/api/auth/register', {
+      method: 'POST',
+      body: { 
+        username: username.value, 
+        email: email.value, 
+        password: password.value,
+        displayName: displayName.value 
+      }
+    })
+    // Kayıt başarılıysa doğrudan login olur veya login sayfasına yönlendirilir
+    router.push('/dashboard')
+  } catch (err) {
+    errorMsg.value = err.data?.statusMessage || err.data?.data?.issues?.[0]?.message || 'Kayıt işlemi başarısız oldu.'
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -48,6 +66,10 @@ const register = async () => {
         <p>Yeni bir hesap oluşturun</p>
       </div>
       
+      <div v-if="errorMsg" style="color: var(--md-error); font-size: 14px; text-align: center; margin-bottom: 16px;">
+        {{ errorMsg }}
+      </div>
+
       <form @submit.prevent="register">
         <div class="input-group">
           <input type="text" id="displayName" v-model="displayName" placeholder=" " />

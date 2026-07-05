@@ -8,11 +8,22 @@ const password = ref('')
 const showPassword = ref(false)
 const isLoading = ref(false)
 
+const errorMsg = ref('')
+
 const login = async () => {
   isLoading.value = true
-  await new Promise(r => setTimeout(r, 1200)) // Animasyonlu fake API beklemesi
-  isLoading.value = false
-  router.push('/dashboard')
+  errorMsg.value = ''
+  try {
+    await $fetch('/api/auth/login', {
+      method: 'POST',
+      body: { identifier: identifier.value, password: password.value }
+    })
+    router.push('/dashboard')
+  } catch (err) {
+    errorMsg.value = err.data?.statusMessage || 'Giriş işlemi başarısız oldu.'
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -22,6 +33,10 @@ const login = async () => {
       <div class="auth-header">
         <h1>Nuxt Auth</h1>
         <p>Hesabınıza giriş yapın</p>
+      </div>
+
+      <div v-if="errorMsg" style="color: var(--md-error); font-size: 14px; text-align: center; margin-bottom: 16px;">
+        {{ errorMsg }}
       </div>
       
       <form @submit.prevent="login">
