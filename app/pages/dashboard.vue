@@ -1,32 +1,50 @@
 <script setup>
 import { useRouter } from 'nuxt/app'
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useToast } from '~/composables/useToast'
 
 const router = useRouter()
-const isMenuOpen = ref(false)
+const { showError } = useToast()
 
-const logout = () => {
-  router.push('/login')
+const isMenuOpen = ref(false)
+const user = ref(null)
+const isLoading = ref(true)
+
+const fetchProfile = async () => {
+  try {
+    const data = await $fetch('/api/auth/me')
+    user.value = data.user
+  } catch (err) {
+    showError('Oturum süreniz dolmuş olabilir, lütfen tekrar giriş yapın.')
+    router.push('/login')
+  } finally {
+    isLoading.value = false
+  }
 }
 
-const stats = [
-  { label: 'Aktif Kullanıcılar', value: '1,234' },
-  { label: 'Toplam Satış', value: '₺45,678' },
-  { label: 'Yeni Mesajlar', value: '89' },
-]
+onMounted(() => {
+  fetchProfile()
+})
+
+const logout = async () => {
+  try {
+    await $fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+  } catch (error) {
+    console.error('Logout error', error)
+  }
+}
 </script>
 
 <template>
-  <div class="dashboard-layout">
+  <div class="dashboard-layout" v-if="!isLoading && user">
     <aside class="sidebar" :class="{ 'is-open': isMenuOpen }">
       <div class="sidebar-header">
         <h2>Nuxt Auth</h2>
       </div>
       <nav class="sidebar-nav">
-        <a href="#" class="active">Ana Sayfa</a>
-        <a href="#">Profil</a>
-        <a href="#">Ayarlar</a>
-        <a href="#">Bildirimler</a>
+        <a href="#" class="active">Profilim</a>
+        <a href="#">Ayarlar (Pek Yakında)</a>
       </nav>
       <div class="sidebar-footer">
         <button @click="logout" class="btn btn-text" style="color: var(--md-error); width: 100%; text-align: left;">Çıkış Yap</button>
@@ -38,33 +56,60 @@ const stats = [
         <button class="menu-btn" @click="isMenuOpen = !isMenuOpen">
           <span class="menu-icon"></span>
         </button>
-        <div class="app-bar-title">Dashboard</div>
+        <div class="app-bar-title">Kontrol Paneli</div>
         <div class="app-bar-actions">
-          <div class="avatar">U</div>
+          <div class="avatar">{{ user.username.charAt(0).toUpperCase() }}</div>
         </div>
       </header>
       
       <div class="content-wrapper">
-        <h1 v-motion :initial="{opacity:0, y:-20}" :enter="{opacity:1, y:0, transition: {delay: 100}}">Hoş Geldiniz!</h1>
-        <p style="color: var(--md-on-bg-medium);" v-motion :initial="{opacity:0, y:-20}" :enter="{opacity:1, y:0, transition: {delay: 200}}">Başarıyla giriş yaptınız. İşte günlük özetiniz.</p>
+        <h1 v-motion :initial="{opacity:0, y:-20}" :enter="{opacity:1, y:0, transition: {delay: 100}}">
+          Hoş Geldin, {{ user.displayName || user.username }}!
+        </h1>
+        <p style="color: var(--md-on-bg-medium);" v-motion :initial="{opacity:0, y:-20}" :enter="{opacity:1, y:0, transition: {delay: 200}}">
+          Profil bilgilerinizi aşağıdan görüntüleyebilirsiniz.
+        </p>
         
         <div class="stats-grid">
           <div 
             class="stat-card card" 
-            v-for="(stat, index) in stats" 
-            :key="index"
             v-motion
             :initial="{opacity:0, scale:0.8}"
-            :enter="{opacity:1, scale:1, transition: {delay: 300 + (index * 100), type: 'spring'}}"
+            :enter="{opacity:1, scale:1, transition: {delay: 300, type: 'spring'}}"
           >
-            <h3>{{ stat.label }}</h3>
-            <div class="stat-value">{{ stat.value }}</div>
+            <h3>Kullanıcı Adı</h3>
+            <div class="stat-value" style="font-size: 20px;">@{{ user.username }}</div>
+          </div>
+
+          <div 
+            class="stat-card card" 
+            v-motion
+            :initial="{opacity:0, scale:0.8}"
+            :enter="{opacity:1, scale:1, transition: {delay: 400, type: 'spring'}}"
+          >
+            <h3>E-posta Adresi</h3>
+            <div class="stat-value" style="font-size: 20px;">{{ user.email }}</div>
+          </div>
+
+          <div 
+            class="stat-card card" 
+            v-motion
+            :initial="{opacity:0, scale:0.8}"
+            :enter="{opacity:1, scale:1, transition: {delay: 500, type: 'spring'}}"
+          >
+            <h3>Hesap Durumu</h3>
+            <div class="stat-value" style="font-size: 20px; color: var(--md-secondary);">
+              Aktif
+            </div>
           </div>
         </div>
       </div>
     </main>
     
     <div class="overlay" v-if="isMenuOpen" @click="isMenuOpen = false"></div>
+  </div>
+  <div v-else-if="isLoading" class="auth-container" style="display:flex; justify-content:center; align-items:center; height: 100vh;">
+    <p>Yükleniyor...</p>
   </div>
 </template>
 
@@ -201,7 +246,6 @@ const stats = [
   font-weight: 500;
 }
 .stat-value {
-  font-size: 32px;
   font-weight: 300;
   color: var(--md-primary);
 }
