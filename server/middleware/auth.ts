@@ -1,4 +1,4 @@
-import { verifyToken } from '~/server/utils/jwt';
+import { verifyToken } from '../utils/jwt';
 
 export default defineEventHandler((event) => {
   // Sadece /api ile başlayan fakat /api/auth altında OMAYAN korumalı rotalar için kontrol

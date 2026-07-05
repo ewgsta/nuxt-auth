@@ -1,9 +1,9 @@
-import { db } from '~/server/db';
-import { users } from '~/server/db/schema';
+import { db } from '../../../server/db';
+import { users } from '../../../server/db/schema';
 import { eq, or } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
-import { signToken } from '~/server/utils/jwt';
+import { signToken } from '../../../server/utils/jwt';
 
 const loginSchema = z.object({
   identifier: z.string().min(1, 'Kullanıcı adı veya e-posta gereklidir.'),
@@ -30,10 +30,10 @@ export default defineEventHandler(async (event) => {
       where: or(eq(users.email, identifier), eq(users.username, identifier))
     });
 
-    if (!user || !user.isActive) {
+    if (!user) {
       throw createError({ 
         statusCode: 401, 
-        statusMessage: 'Geçersiz giriş bilgileri veya pasif hesap.' 
+        statusMessage: 'Geçersiz giriş bilgileri.' 
       });
     }
 
@@ -44,6 +44,13 @@ export default defineEventHandler(async (event) => {
       throw createError({ 
         statusCode: 401, 
         statusMessage: 'Geçersiz giriş bilgileri.' 
+      });
+    }
+
+    if (!user.isActive) {
+      throw createError({ 
+        statusCode: 403, 
+        statusMessage: 'Lütfen giriş yapmadan önce hesabınızı (e-posta adresinizi) onaylayın.' 
       });
     }
 

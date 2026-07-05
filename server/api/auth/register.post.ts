@@ -1,10 +1,10 @@
-import { db } from '~/server/db';
-import { users } from '~/server/db/schema';
+import { db } from '../../../server/db';
+import { users } from '../../../server/db/schema';
 import { eq, or } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
-import { sendEmail } from '~/server/utils/email';
+import { sendEmail } from '../../../server/utils/email';
 
 const registerSchema = z.object({
   username: z.string().min(3, 'Kullanıcı adı en az 3 karakter olmalıdır.').max(30),

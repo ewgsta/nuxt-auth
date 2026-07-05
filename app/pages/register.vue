@@ -1,8 +1,11 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'nuxt/app'
+import { useToast } from '~/composables/useToast'
 
 const router = useRouter()
+const { showSuccess, showError } = useToast()
+
 const username = ref('')
 const displayName = ref('')
 const email = ref('')
@@ -29,16 +32,11 @@ const passwordStrength = computed(() => {
   return { score: 0, text: 'Çok Zayıf', colors: ['var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)'] }
 })
 
-const errorMsg = ref('')
-const successMsg = ref('')
-
 const register = async () => {
-  if (!acceptTerms.value) return alert("Şartları kabul etmelisiniz.")
-  if (passwordStrength.value.score < 2) return alert("Şifreniz çok zayıf. Lütfen daha güçlü bir şifre seçin.")
+  if (!acceptTerms.value) return showError("Şartları kabul etmelisiniz.")
+  if (passwordStrength.value.score < 2) return showError("Şifreniz çok zayıf. Lütfen daha güçlü bir şifre seçin.")
   
   isLoading.value = true
-  errorMsg.value = ''
-  successMsg.value = ''
   
   try {
     const res = await $fetch('/api/auth/register', {
@@ -51,16 +49,14 @@ const register = async () => {
       }
     })
     
-    // Doğrulama maili gönderildi uyarısı gösterilecek, doğrudan yönlendirilmeyecek.
-    successMsg.value = res.message || 'Kayıt başarılı! Lütfen e-posta adresinizi doğrulayın.'
+    showSuccess('Kayıt başarılı! Hesabınızı onayladıktan sonra giriş yapabilirsiniz.', 5000)
     
-    // Kullanıcıya emaili okuması için süre tanıyıp login'e yönlendirebiliriz
     setTimeout(() => {
       router.push('/login')
     }, 4000)
 
   } catch (err) {
-    errorMsg.value = err.data?.statusMessage || err.data?.data?.issues?.[0]?.message || 'Kayıt işlemi başarısız oldu.'
+    showError(err.data?.statusMessage || err.data?.data?.issues?.[0]?.message || 'Kayıt işlemi başarısız oldu.')
   } finally {
     isLoading.value = false
   }
@@ -73,10 +69,6 @@ const register = async () => {
       <div class="auth-header">
         <h1>Nuxt Auth</h1>
         <p>Yeni bir hesap oluşturun</p>
-      </div>
-      
-      <div v-if="errorMsg" style="color: var(--md-error); font-size: 14px; text-align: center; margin-bottom: 16px;">
-        {{ errorMsg }}
       </div>
 
       <form @submit.prevent="register">
