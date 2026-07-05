@@ -2,10 +2,12 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'nuxt/app'
 import { useToast } from '~/composables/useToast'
+import { useTranslation } from '~/composables/useTranslation'
 
 const router = useRouter()
 const route = useRoute()
 const { showSuccess, showError } = useToast()
+const { t } = useTranslation()
 
 const password = ref('')
 const confirmPassword = ref('')
@@ -17,32 +19,32 @@ const token = route.query.token
 const passwordStrength = computed(() => {
   const p = password.value
   let score = 0
-  if (!p) return { score: 0, text: 'None', colors: ['var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)'] }
+  if (!p) return { score: 0, text: t('resetPassword.passwordStrength.none'), colors: ['var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)'] }
   
   if (p.length > 5) score += 1
   if (p.length > 8) score += 1
   if (/[A-Z]/.test(p)) score += 1
   if (/[0-9]/.test(p) && /[^A-Za-z0-9]/.test(p)) score += 1
   
-  if (score === 1) return { score, text: 'Weak', colors: ['var(--md-error)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)'] }
-  if (score === 2) return { score, text: 'Medium', colors: ['#ffb300', '#ffb300', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)'] }
-  if (score === 3) return { score, text: 'Good', colors: ['var(--md-primary)', 'var(--md-primary)', 'var(--md-primary)', 'var(--md-surface-overlay-2)'] }
-  if (score === 4) return { score, text: 'Strong', colors: ['var(--md-secondary)', 'var(--md-secondary)', 'var(--md-secondary)', 'var(--md-secondary)'] }
+  if (score === 1) return { score, text: t('resetPassword.passwordStrength.weak'), colors: ['var(--md-error)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)'] }
+  if (score === 2) return { score, text: t('resetPassword.passwordStrength.medium'), colors: ['#ffb300', '#ffb300', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)'] }
+  if (score === 3) return { score, text: t('resetPassword.passwordStrength.good'), colors: ['var(--md-primary)', 'var(--md-primary)', 'var(--md-primary)', 'var(--md-surface-overlay-2)'] }
+  if (score === 4) return { score, text: t('resetPassword.passwordStrength.strong'), colors: ['var(--md-secondary)', 'var(--md-secondary)', 'var(--md-secondary)', 'var(--md-secondary)'] }
   
-  return { score: 0, text: 'Very Weak', colors: ['var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)'] }
+  return { score: 0, text: t('resetPassword.passwordStrength.veryWeak'), colors: ['var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)', 'var(--md-surface-overlay-2)'] }
 })
 
 const resetPassword = async () => {
   if (!token) {
-    return showError("Invalid or missing token. Please check your link.")
+    return showError(t('resetPassword.invalidTokenError'))
   }
 
   if (password.value !== confirmPassword.value) {
-    return showError("Passwordler uyuşmuyor.")
+    return showError(t('resetPassword.passwordsDoNotMatch'))
   }
 
   if (passwordStrength.value.score < 2) {
-    return showError("Your password is too weak. Please choose a stronger password.")
+    return showError(t('resetPassword.passwordTooWeak'))
   }
 
   isLoading.value = true
@@ -56,14 +58,14 @@ const resetPassword = async () => {
       }
     })
     
-    showSuccess(res.message || 'Passwordniz başarıyla sıfırlandı!')
+    showSuccess(res.message || t('resetPassword.successMessage'))
     
     setTimeout(() => {
       router.push('/login')
     }, 2000)
 
   } catch (err) {
-    showError(err.data?.statusMessage || 'Process failed. The link might have expired.')
+    showError(err.data?.statusMessage || t('resetPassword.errorMessage'))
   } finally {
     isLoading.value = false
   }
@@ -74,21 +76,21 @@ const resetPassword = async () => {
   <div class="auth-container">
     <div class="card" v-motion :initial="{ opacity: 0, y: 50 }" :enter="{ opacity: 1, y: 0, transition: { type: 'spring', stiffness: 250, damping: 25 } }">
       <div class="auth-header">
-        <h1>Yeni Password Belirle</h1>
-        <p>Please enter a new password for your account.</p>
+        <h1>{{ t('resetPassword.title') }}</h1>
+        <p>{{ t('resetPassword.subtitle') }}</p>
       </div>
 
       <div v-if="!token" style="color: var(--md-error); text-align: center; margin-bottom: 24px;">
-        Invalid connection. Missing token.
+        {{ t('resetPassword.invalidToken') }}
       </div>
       
       <form @submit.prevent="resetPassword" v-else>
         <div class="input-group" style="margin-bottom: 12px;">
           <input :type="showPassword ? 'text' : 'password'" id="password" v-model="password" placeholder=" " required />
-          <label for="password">Yeni Password</label>
+          <label for="password">{{ t('resetPassword.newPasswordLabel') }}</label>
           <button type="button" class="password-toggle" @click="showPassword = !showPassword">
-            <span v-if="showPassword">Hide</span>
-            <span v-else>Show</span>
+            <span v-if="showPassword">{{ t('resetPassword.hide') }}</span>
+            <span v-else>{{ t('resetPassword.show') }}</span>
           </button>
         </div>
         
@@ -106,16 +108,16 @@ const resetPassword = async () => {
 
         <div class="input-group">
           <input type="password" id="confirmPassword" v-model="confirmPassword" placeholder=" " required />
-          <label for="confirmPassword">Yeni Password (Tekrar)</label>
+          <label for="confirmPassword">{{ t('resetPassword.confirmPasswordLabel') }}</label>
         </div>
         
         <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="isLoading">
-          <span v-if="!isLoading">Passwordyi Güncelle</span>
-          <span v-else>Updating...</span>
+          <span v-if="!isLoading">{{ t('resetPassword.updatePassword') }}</span>
+          <span v-else>{{ t('resetPassword.updating') }}</span>
         </button>
         
         <div class="auth-footer" style="justify-content: center; margin-top: 16px;">
-          <NuxtLink to="/login" class="btn-text" style="font-size: 14px; padding: 4px;">Back to Sign In</NuxtLink>
+          <NuxtLink to="/login" class="btn-text" style="font-size: 14px; padding: 4px;">{{ t('resetPassword.backToLogin') }}</NuxtLink>
         </div>
       </form>
     </div>

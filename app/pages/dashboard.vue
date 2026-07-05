@@ -2,9 +2,11 @@
 import { useRouter } from 'nuxt/app'
 import { ref, onMounted } from 'vue'
 import { useToast } from '~/composables/useToast'
+import { useTranslation } from '~/composables/useTranslation'
 
 const router = useRouter()
 const { showSuccess, showError } = useToast()
+const { t } = useTranslation()
 
 const isMenuOpen = ref(false)
 const currentTab = ref('profile') // 'profile' veya 'settings'
@@ -27,7 +29,7 @@ const fetchProfile = async () => {
     const data = await $fetch('/api/auth/me')
     user.value = data.user
   } catch (err) {
-    showError('Your session might have expired, please log in again.')
+    showError(t('dashboard.messages.sessionExpired'))
     router.push('/login')
   } finally {
     isLoading.value = false
@@ -59,9 +61,9 @@ const resetForms = () => {
 }
 
   const requestUpdate = async (type) => {
-  if (!currentPassword.value) return showError('Please enter your current password.')
-  if (type === 'email' && !newEmail.value) return showError("You didn't enter your new email address.")
-  if (type === 'password' && newPassword.value.length < 6) return showError('New password must be at least 6 characters.')
+  if (!currentPassword.value) return showError(t('dashboard.messages.enterCurrentPassword'))
+  if (type === 'email' && !newEmail.value) return showError(t('dashboard.messages.enterNewEmail'))
+  if (type === 'password' && newPassword.value.length < 6) return showError(t('dashboard.messages.passwordLength'))
 
   isActionLoading.value = true
   try {
@@ -78,15 +80,15 @@ const resetForms = () => {
     verificationStep.value = true
     showSuccess(res.message)
   } catch (err) {
-    showError(err.data?.statusMessage || 'İşlem başlatılamadı. Passwordnizi kontrol edin.')
+    showError(err.data?.statusMessage || t('dashboard.messages.processFailed'))
   } finally {
     isActionLoading.value = false
   }
 }
 
 const confirmUpdate = async () => {
-  if (updateType.value === 'password' && passCode.value.length !== 6) return showError('Please enter the 6-digit code completely.')
-  if (updateType.value === 'email' && (oldEmailCode.value.length !== 6 || newEmailCode.value.length !== 6)) return showError('Please enter both 6-digit codes completely.')
+  if (updateType.value === 'password' && passCode.value.length !== 6) return showError(t('dashboard.messages.enter6DigitCode'))
+  if (updateType.value === 'email' && (oldEmailCode.value.length !== 6 || newEmailCode.value.length !== 6)) return showError(t('dashboard.messages.enterBothCodes'))
 
   isActionLoading.value = true
   try {
@@ -109,7 +111,7 @@ const confirmUpdate = async () => {
     resetForms()
     fetchProfile() // Bilgileri yeniden çek
   } catch (err) {
-    showError(err.data?.statusMessage || 'Code is incorrect or expired.')
+    showError(err.data?.statusMessage || t('dashboard.messages.incorrectCode'))
   } finally {
     isActionLoading.value = false
   }
@@ -120,14 +122,14 @@ const confirmUpdate = async () => {
   <div class="dashboard-layout" v-if="!isLoading && user">
     <aside class="sidebar" :class="{ 'is-open': isMenuOpen }">
       <div class="sidebar-header">
-        <h2>Nuxt Auth</h2>
+        <h2>{{ t('dashboard.sidebar.title') }}</h2>
       </div>
       <nav class="sidebar-nav">
-        <a href="#" :class="{ active: currentTab === 'profile' }" @click.prevent="currentTab = 'profile'; resetForms()">My Profile</a>
-        <a href="#" :class="{ active: currentTab === 'settings' }" @click.prevent="currentTab = 'settings'">Settings</a>
+        <a href="#" :class="{ active: currentTab === 'profile' }" @click.prevent="currentTab = 'profile'; resetForms()">{{ t('dashboard.sidebar.myProfile') }}</a>
+        <a href="#" :class="{ active: currentTab === 'settings' }" @click.prevent="currentTab = 'settings'">{{ t('dashboard.sidebar.settings') }}</a>
       </nav>
       <div class="sidebar-footer">
-        <button @click="logout" class="btn btn-text" style="color: var(--md-error); width: 100%; text-align: left;">Log Out</button>
+        <button @click="logout" class="btn btn-text" style="color: var(--md-error); width: 100%; text-align: left;">{{ t('dashboard.sidebar.logout') }}</button>
       </div>
     </aside>
     
@@ -136,7 +138,7 @@ const confirmUpdate = async () => {
         <button class="menu-btn" @click="isMenuOpen = !isMenuOpen">
           <span class="menu-icon"></span>
         </button>
-        <div class="app-bar-title">{{ currentTab === 'profile' ? 'Dashboard' : 'Settings' }}</div>
+        <div class="app-bar-title">{{ currentTab === 'profile' ? t('dashboard.header.dashboard') : t('dashboard.header.settings') }}</div>
         <div class="app-bar-actions">
           <div class="avatar">{{ user.username.charAt(0).toUpperCase() }}</div>
         </div>
@@ -146,52 +148,52 @@ const confirmUpdate = async () => {
         <!-- PROFİL SEKME -->
         <div v-if="currentTab === 'profile'">
           <h1 v-motion :initial="{opacity:0, y:-20}" :enter="{opacity:1, y:0, transition: {delay: 100}}">
-            Welcome, {{ user.displayName || user.username }}!
+            {{ t('dashboard.profile.welcome', { name: user.displayName || user.username }) }}
           </h1>
           <p style="color: var(--md-on-bg-medium);" v-motion :initial="{opacity:0, y:-20}" :enter="{opacity:1, y:0, transition: {delay: 200}}">
-            You can view your profile information below.
+            {{ t('dashboard.profile.description') }}
           </p>
           
           <div class="stats-grid">
             <div class="stat-card card" v-motion :initial="{opacity:0, scale:0.8}" :enter="{opacity:1, scale:1, transition: {delay: 300, type: 'spring'}}">
-              <h3>Username</h3>
+              <h3>{{ t('dashboard.profile.username') }}</h3>
               <div class="stat-value" style="font-size: 20px;">@{{ user.username }}</div>
             </div>
 
             <div class="stat-card card" v-motion :initial="{opacity:0, scale:0.8}" :enter="{opacity:1, scale:1, transition: {delay: 400, type: 'spring'}}">
-              <h3>Email Address</h3>
+              <h3>{{ t('dashboard.profile.email') }}</h3>
               <div class="stat-value" style="font-size: 20px;">{{ user.email }}</div>
             </div>
 
             <div class="stat-card card" v-motion :initial="{opacity:0, scale:0.8}" :enter="{opacity:1, scale:1, transition: {delay: 500, type: 'spring'}}">
-              <h3>Account Status</h3>
-              <div class="stat-value" style="font-size: 20px; color: var(--md-secondary);">Active</div>
+              <h3>{{ t('dashboard.profile.accountStatus') }}</h3>
+              <div class="stat-value" style="font-size: 20px; color: var(--md-secondary);">{{ t('dashboard.profile.active') }}</div>
             </div>
           </div>
         </div>
 
         <!-- AYARLAR SEKME -->
         <div v-if="currentTab === 'settings'" v-motion :initial="{opacity:0}" :enter="{opacity:1}">
-          <h1>Hesap Settingsı</h1>
-          <p style="color: var(--md-on-bg-medium); margin-bottom: 32px;">Passwordnizi veya kayıtlı e-posta adresinizi bu ekrandan güvenle güncelleyebilirsiniz.</p>
+          <h1>{{ t('dashboard.settings.title') }}</h1>
+          <p style="color: var(--md-on-bg-medium); margin-bottom: 32px;">{{ t('dashboard.settings.description') }}</p>
           
           <div class="settings-grid">
             <!-- Password Değiştirme Kartı -->
             <div class="card settings-card">
-              <h3>Password Değiştir</h3>
+              <h3>{{ t('dashboard.settings.changePassword') }}</h3>
               
               <div v-if="verificationStep && updateType === 'password'" v-motion :initial="{opacity:0}" :enter="{opacity:1}">
-                <p style="font-size: 14px; margin-bottom: 24px; color: var(--md-secondary);">A 6-digit code has been sent to your current email address. Please enter the code to confirm the process.</p>
+                <p style="font-size: 14px; margin-bottom: 24px; color: var(--md-secondary);">{{ t('dashboard.settings.passwordVerification') }}</p>
                 <form @submit.prevent="confirmUpdate">
                   <div class="input-group">
                     <input type="text" id="passCode" v-model="passCode" placeholder=" " maxlength="6" required />
-                    <label for="passCode">Verification Code</label>
+                    <label for="passCode">{{ t('dashboard.settings.verificationCode') }}</label>
                   </div>
                   <div style="display:flex; gap: 12px;">
-                    <button type="button" class="btn btn-text" @click="resetForms">Cancel</button>
+                    <button type="button" class="btn btn-text" @click="resetForms">{{ t('dashboard.settings.cancel') }}</button>
                     <button type="submit" class="btn btn-primary" style="flex:1" :disabled="isActionLoading">
-                      <span v-if="!isActionLoading">Confirm</span>
-                      <span v-else>...</span>
+                      <span v-if="!isActionLoading">{{ t('dashboard.settings.confirm') }}</span>
+                      <span v-else>{{ t('dashboard.settings.confirming') }}</span>
                     </button>
                   </div>
                 </form>
@@ -200,36 +202,36 @@ const confirmUpdate = async () => {
               <form v-else @submit.prevent="requestUpdate('password')" :class="{ 'disabled-form': verificationStep }">
                 <div class="input-group">
                   <input type="password" id="curPass" v-model="currentPassword" placeholder=" " required :disabled="verificationStep" />
-                  <label for="curPass">Mevcut Passwordniz</label>
+                  <label for="curPass">{{ t('dashboard.settings.currentPassword') }}</label>
                 </div>
                 <div class="input-group">
                   <input type="password" id="newPass" v-model="newPassword" placeholder=" " required :disabled="verificationStep" />
-                  <label for="newPass">Yeni Passwordniz</label>
+                  <label for="newPass">{{ t('dashboard.settings.newPassword') }}</label>
                 </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="verificationStep || isActionLoading">Send Code</button>
+                <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="verificationStep || isActionLoading">{{ t('dashboard.settings.sendCode') }}</button>
               </form>
             </div>
 
             <!-- Change Emailme Kartı -->
             <div class="card settings-card">
-              <h3>Change Email</h3>
+              <h3>{{ t('dashboard.settings.changeEmail') }}</h3>
               
               <div v-if="verificationStep && updateType === 'email'" v-motion :initial="{opacity:0}" :enter="{opacity:1}">
-                <p style="font-size: 14px; margin-bottom: 24px; color: var(--md-secondary);">For your security, enter the codes sent to both your current and new email addresses.</p>
+                <p style="font-size: 14px; margin-bottom: 24px; color: var(--md-secondary);">{{ t('dashboard.settings.emailVerification') }}</p>
                 <form @submit.prevent="confirmUpdate">
                   <div class="input-group">
                     <input type="text" id="oldEmailCode" v-model="oldEmailCode" placeholder=" " maxlength="6" required />
-                    <label for="oldEmailCode">Code in Current Email</label>
+                    <label for="oldEmailCode">{{ t('dashboard.settings.codeInCurrentEmail') }}</label>
                   </div>
                   <div class="input-group">
                     <input type="text" id="newEmailCode" v-model="newEmailCode" placeholder=" " maxlength="6" required />
-                    <label for="newEmailCode">Code in New Email</label>
+                    <label for="newEmailCode">{{ t('dashboard.settings.codeInNewEmail') }}</label>
                   </div>
                   <div style="display:flex; gap: 12px;">
-                    <button type="button" class="btn btn-text" @click="resetForms">Cancel</button>
+                    <button type="button" class="btn btn-text" @click="resetForms">{{ t('dashboard.settings.cancel') }}</button>
                     <button type="submit" class="btn btn-primary" style="flex:1" :disabled="isActionLoading">
-                      <span v-if="!isActionLoading">Confirm</span>
-                      <span v-else>...</span>
+                      <span v-if="!isActionLoading">{{ t('dashboard.settings.confirm') }}</span>
+                      <span v-else>{{ t('dashboard.settings.confirming') }}</span>
                     </button>
                   </div>
                 </form>
@@ -238,13 +240,13 @@ const confirmUpdate = async () => {
               <form v-else @submit.prevent="requestUpdate('email')" :class="{ 'disabled-form': verificationStep }">
                 <div class="input-group">
                   <input type="email" id="newEmail" v-model="newEmail" placeholder=" " required :disabled="verificationStep" />
-                  <label for="newEmail">Yeni Email Address</label>
+                  <label for="newEmail">{{ t('dashboard.settings.newEmailAddress') }}</label>
                 </div>
                 <div class="input-group">
                   <input type="password" id="curPassForEmail" v-model="currentPassword" placeholder=" " required :disabled="verificationStep" />
-                  <label for="curPassForEmail">Mevcut Passwordniz (Onay için)</label>
+                  <label for="curPassForEmail">{{ t('dashboard.settings.currentPasswordForEmail') }}</label>
                 </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="verificationStep || isActionLoading">Send Code</button>
+                <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="verificationStep || isActionLoading">{{ t('dashboard.settings.sendCode') }}</button>
               </form>
             </div>
 
@@ -258,7 +260,7 @@ const confirmUpdate = async () => {
   </div>
   
   <div v-else-if="isLoading" class="auth-container" style="display:flex; justify-content:center; align-items:center; height: 100vh;">
-    <p>Loading...</p>
+    <p>{{ t('dashboard.messages.loading') }}</p>
   </div>
 </template>
 

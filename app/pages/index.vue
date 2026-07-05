@@ -1,5 +1,8 @@
 <script setup>
 import { navigateTo } from 'nuxt/app'
+import { useTranslation } from '~/composables/useTranslation'
+
+const { t } = useTranslation()
 
 definePageMeta({
   middleware: [
@@ -10,5 +13,5 @@ definePageMeta({
 })
 </script>
 <template>
-  <div>Yönlendiriliyor...</div>
+  <div>{{ t('index.redirecting') }}</div>
 </template>

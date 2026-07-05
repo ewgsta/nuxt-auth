@@ -1,0 +1,132 @@
+{
+  "forgotPassword": {
+    "title": "Reset Password",
+    "description": "Enter your email address, and we'll send you a reset link.",
+    "processCompleted": "Process Completed!",
+    "emailLabel": "Email Address",
+    "sendLink": "Send Link",
+    "sending": "Sending...",
+    "backToLogin": "Back to Sign In",
+    "successMessage": "Your reset request has been received.",
+    "errorMessage": "Process failed. Please enter a valid email."
+  },
+  "login": {
+    "title": "Nuxt Auth",
+    "subtitle": "Sign in to your account",
+    "identifierLabel": "Username or Email",
+    "passwordLabel": "Password",
+    "show": "Show",
+    "hide": "Hide",
+    "signIn": "Sign In",
+    "signingIn": "Signing in...",
+    "forgotPassword": "Forgot Password?",
+    "createAccount": "Create Account",
+    "successMessage": "Successfully logged in!",
+    "errorMessage": "Login failed."
+  },
+  "register": {
+    "title": "Nuxt Auth",
+    "subtitle": "Create a new account",
+    "displayNameLabel": "Display Name (Optional)",
+    "usernameLabel": "Username",
+    "emailLabel": "Email Address",
+    "passwordLabel": "Password",
+    "show": "Show",
+    "hide": "Hide",
+    "passwordStrength": {
+      "none": "None",
+      "veryWeak": "Very Weak",
+      "weak": "Weak",
+      "medium": "Medium",
+      "good": "Good",
+      "strong": "Strong"
+    },
+    "acceptTerms": "I accept the terms and conditions",
+    "signUp": "Sign Up",
+    "creating": "Creating...",
+    "alreadyHaveAccount": "Already have an account?",
+    "signIn": "Sign In",
+    "mustAcceptTerms": "You must accept the terms and conditions.",
+    "passwordTooWeak": "Your password is too weak. Please choose a stronger password.",
+    "successMessage": "Registration successful! You can log in after verifying your account.",
+    "errorMessage": "Registration failed."
+  },
+  "resetPassword": {
+    "title": "Set New Password",
+    "subtitle": "Please enter a new password for your account.",
+    "invalidToken": "Invalid connection. Missing token.",
+    "newPasswordLabel": "New Password",
+    "confirmPasswordLabel": "Confirm New Password",
+    "show": "Show",
+    "hide": "Hide",
+    "passwordStrength": {
+      "none": "None",
+      "veryWeak": "Very Weak",
+      "weak": "Weak",
+      "medium": "Medium",
+      "good": "Good",
+      "strong": "Strong"
+    },
+    "updatePassword": "Update Password",
+    "updating": "Updating...",
+    "backToLogin": "Back to Sign In",
+    "invalidTokenError": "Invalid or missing token. Please check your link.",
+    "passwordsDoNotMatch": "Passwords do not match.",
+    "passwordTooWeak": "Your password is too weak. Please choose a stronger password.",
+    "successMessage": "Your password has been successfully reset!",
+    "errorMessage": "Process failed. The link might have expired."
+  },
+  "dashboard": {
+    "sidebar": {
+      "title": "Nuxt Auth",
+      "myProfile": "My Profile",
+      "settings": "Settings",
+      "logout": "Log Out"
+    },
+    "header": {
+      "dashboard": "Dashboard",
+      "settings": "Settings"
+    },
+    "profile": {
+      "welcome": "Welcome, {name}!",
+      "description": "You can view your profile information below.",
+      "username": "Username",
+      "email": "Email Address",
+      "accountStatus": "Account Status",
+      "active": "Active"
+    },
+    "settings": {
+      "title": "Account Settings",
+      "description": "You can securely update your password or registered email address here.",
+      "changePassword": "Change Password",
+      "passwordVerification": "A 6-digit code has been sent to your current email address. Please enter the code to confirm the process.",
+      "verificationCode": "Verification Code",
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "confirming": "...",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "sendCode": "Send Code",
+      "changeEmail": "Change Email",
+      "emailVerification": "For your security, enter the codes sent to both your current and new email addresses.",
+      "codeInCurrentEmail": "Code in Current Email",
+      "codeInNewEmail": "Code in New Email",
+      "newEmailAddress": "New Email Address",
+      "currentPasswordForEmail": "Current Password (For Confirmation)"
+    },
+    "messages": {
+      "sessionExpired": "Your session might have expired, please log in again.",
+      "enterCurrentPassword": "Please enter your current password.",
+      "enterNewEmail": "You didn't enter your new email address.",
+      "passwordLength": "New password must be at least 6 characters.",
+      "enter6DigitCode": "Please enter the 6-digit code completely.",
+      "enterBothCodes": "Please enter both 6-digit codes completely.",
+      "incorrectCode": "Code is incorrect or expired.",
+      "processFailed": "Process could not be started. Check your password.",
+      "loading": "Loading..."
+    }
+  },
+  "index": {
+    "redirecting": "Redirecting..."
+  }
+}
