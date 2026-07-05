@@ -1,15 +1,31 @@
 <script setup>
 import { ref } from 'vue'
+import { useToast } from '~/composables/useToast'
+
+const { showSuccess, showError } = useToast()
 
 const email = ref('')
 const isLoading = ref(false)
 const isSent = ref(false)
+const infoMessage = ref('')
 
-const resetPassword = async () => {
+const requestReset = async () => {
   isLoading.value = true
-  await new Promise(r => setTimeout(r, 1200))
-  isLoading.value = false
-  isSent.value = true
+  
+  try {
+    const res = await $fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      body: { email: email.value }
+    })
+    
+    isSent.value = true
+    infoMessage.value = res.message
+    showSuccess('Sıfırlama talebiniz alındı.')
+  } catch (err) {
+    showError(err.data?.statusMessage || 'İşlem başarısız oldu. Lütfen geçerli bir e-posta girin.')
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -19,10 +35,10 @@ const resetPassword = async () => {
       <div class="auth-header">
         <h1>Şifre Sıfırlama</h1>
         <p v-if="!isSent">E-posta adresinizi girin, size bir sıfırlama bağlantısı gönderelim.</p>
-        <p v-else style="color: var(--md-secondary)">Sıfırlama bağlantısı e-posta adresinize gönderildi!</p>
+        <p v-else style="color: var(--md-secondary)">İşlem Tamamlandı!</p>
       </div>
       
-      <form @submit.prevent="resetPassword" v-if="!isSent" v-motion :leave="{opacity: 0, height: 0}">
+      <form @submit.prevent="requestReset" v-if="!isSent" v-motion :leave="{opacity: 0, height: 0}">
         <div class="input-group">
           <input type="email" id="email" v-model="email" placeholder=" " required />
           <label for="email">E-posta Adresi</label>
@@ -33,6 +49,10 @@ const resetPassword = async () => {
           <span v-else>Gönderiliyor...</span>
         </button>
       </form>
+
+      <div v-else style="text-align: center; margin-bottom: 24px;">
+        <p style="color: var(--md-on-bg-medium); line-height: 1.5; font-size: 14px;">{{ infoMessage }}</p>
+      </div>
       
       <div class="auth-footer" style="justify-content: center;">
         <NuxtLink to="/login" class="btn-text">Giriş Ekranına Dön</NuxtLink>
