@@ -26,7 +26,7 @@ export default defineEventHandler((event) => {
     if (!token) {
       throw createError({
         statusCode: 401,
-        message: 'Yetkisiz erişim. Oturum bulunamadı.'
+        message: 'Unauthorized access. Session not found.'
       });
     }
 
@@ -35,7 +35,7 @@ export default defineEventHandler((event) => {
     if (!decoded) {
       throw createError({
         statusCode: 401,
-        message: 'Geçersiz veya süresi dolmuş oturum.'
+        message: 'Invalid or expired session.'
       });
     }
 

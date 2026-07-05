@@ -5,8 +5,8 @@ import bcrypt from 'bcrypt';
 import { z } from 'zod';
 
 const resetPasswordSchema = z.object({
-  token: z.string().min(1, 'Token gereklidir.'),
-  newPassword: z.string().min(6, 'Yeni şifre en az 6 karakter olmalıdır.')
+  token: z.string().min(1, 'Token is required.'),
+  newPassword: z.string().min(6, 'New password must be at least 6 characters.')
 });
 
 export default defineEventHandler(async (event) => {
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     if (!parsed.success) {
       throw createError({ 
         statusCode: 400, 
-        statusMessage: 'Geçersiz veya eksik veri.',
+        statusMessage: 'Invalid or missing data.',
         data: parsed.error.format()
       });
     }
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
     if (!user) {
       throw createError({ 
         statusCode: 400, 
-        statusMessage: 'Geçersiz veya süresi dolmuş şifre sıfırlama bağlantısı.' 
+        statusMessage: 'Invalid or expired password reset link.' 
       });
     }
 
@@ -52,13 +52,13 @@ export default defineEventHandler(async (event) => {
 
     return { 
       success: true, 
-      message: 'Şifreniz başarıyla sıfırlandı. Yeni şifrenizle giriş yapabilirsiniz.'
+      message: 'Your password has been successfully reset. You can now log in with your new password.'
     };
   } catch (error: any) {
     if (error.statusCode) throw error;
     throw createError({
       statusCode: 500,
-      statusMessage: 'Sunucu hatası oluştu.'
+      statusMessage: 'Internal server error occurred.'
     });
   }
 });

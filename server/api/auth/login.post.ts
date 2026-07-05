@@ -6,8 +6,8 @@ import { z } from 'zod';
 import { signToken } from '../../../server/utils/jwt';
 
 const loginSchema = z.object({
-  identifier: z.string().min(1, 'Kullanıcı adı veya e-posta gereklidir.'),
-  password: z.string().min(1, 'Şifre gereklidir.'),
+  identifier: z.string().min(1, 'Username or email is required.'),
+  password: z.string().min(1, 'Password is required.'),
 });
 
 export default defineEventHandler(async (event) => {
@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     if (!parsed.success) {
       throw createError({ 
         statusCode: 400, 
-        statusMessage: 'Geçersiz veri', 
+        statusMessage: 'Invalid data', 
         data: parsed.error.format() 
       });
     }
@@ -33,24 +33,24 @@ export default defineEventHandler(async (event) => {
     if (!user) {
       throw createError({ 
         statusCode: 401, 
-        statusMessage: 'Geçersiz giriş bilgileri.' 
+        statusMessage: 'Invalid credentials.' 
       });
     }
 
-    // Şifreyi doğrula
+    // Passwordyi doğrula
     const isPasswordValid = await bcrypt.compare(password, user.password);
     
     if (!isPasswordValid) {
       throw createError({ 
         statusCode: 401, 
-        statusMessage: 'Geçersiz giriş bilgileri.' 
+        statusMessage: 'Invalid credentials.' 
       });
     }
 
     if (!user.isActive) {
       throw createError({ 
         statusCode: 403, 
-        statusMessage: 'Lütfen giriş yapmadan önce hesabınızı (e-posta adresinizi) onaylayın.' 
+        statusMessage: 'Please verify your account (email address) before logging in.' 
       });
     }
 
@@ -78,7 +78,7 @@ export default defineEventHandler(async (event) => {
     if (error.statusCode) throw error;
     throw createError({
       statusCode: 500,
-      statusMessage: 'Sunucu hatası oluştu.'
+      statusMessage: 'Internal server error occurred.'
     });
   }
 });

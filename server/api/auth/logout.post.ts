@@ -6,5 +6,5 @@ export default defineEventHandler(async (event) => {
     path: '/'
   });
 
-  return { success: true, message: 'Çıkış yapıldı' };
+  return { success: true, message: 'Logged out successfully' };
 });

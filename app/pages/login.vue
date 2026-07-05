@@ -19,10 +19,10 @@ const login = async () => {
       body: { identifier: identifier.value, password: password.value }
     })
     
-    showSuccess('Başarıyla giriş yaptınız!')
+    showSuccess('Successfully logged in!')
     router.push('/dashboard')
   } catch (err) {
-    showError(err.data?.statusMessage || 'Giriş işlemi başarısız oldu.')
+    showError(err.data?.statusMessage || 'Login failed.')
   } finally {
     isLoading.value = false
   }
@@ -34,32 +34,32 @@ const login = async () => {
     <div class="card" v-motion :initial="{ opacity: 0, y: 50 }" :enter="{ opacity: 1, y: 0, transition: { type: 'spring', stiffness: 250, damping: 25 } }">
       <div class="auth-header">
         <h1>Nuxt Auth</h1>
-        <p>Hesabınıza giriş yapın</p>
+        <p>Sign in to your account</p>
       </div>
 
       <form @submit.prevent="login">
         <div class="input-group">
           <input type="text" id="identifier" v-model="identifier" placeholder=" " required />
-          <label for="identifier">Kullanıcı Adı veya E-posta</label>
+          <label for="identifier">Username veya E-posta</label>
         </div>
         
         <div class="input-group">
           <input :type="showPassword ? 'text' : 'password'" id="password" v-model="password" placeholder=" " required />
-          <label for="password">Şifre</label>
+          <label for="password">Password</label>
           <button type="button" class="password-toggle" @click="showPassword = !showPassword">
-            <span v-if="showPassword">Gizle</span>
-            <span v-else>Göster</span>
+            <span v-if="showPassword">Hide</span>
+            <span v-else>Show</span>
           </button>
         </div>
         
         <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="isLoading">
-          <span v-if="!isLoading">Giriş Yap</span>
-          <span v-else>Giriş Yapılıyor...</span>
+          <span v-if="!isLoading">Sign In</span>
+          <span v-else>Sign Inılıyor...</span>
         </button>
         
         <div class="auth-footer">
-          <NuxtLink to="/forgot-password" class="btn-text" style="font-size: 12px; padding: 4px;">Şifremi Unuttum</NuxtLink>
-          <NuxtLink to="/register" class="btn-text" style="font-size: 12px; padding: 4px;">Hesap Oluştur</NuxtLink>
+          <NuxtLink to="/forgot-password" class="btn-text" style="font-size: 12px; padding: 4px;">Passwordmi Unuttum</NuxtLink>
+          <NuxtLink to="/register" class="btn-text" style="font-size: 12px; padding: 4px;">Create Account</NuxtLink>
         </div>
       </form>
     </div>

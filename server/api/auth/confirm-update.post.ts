@@ -6,7 +6,7 @@ import bcrypt from 'bcrypt';
 
 const confirmUpdateSchema = z.object({
   type: z.enum(['password', 'email']),
-  code: z.string().length(6, 'Kod 6 haneli olmalıdır.'),
+  code: z.string().length(6, 'Code must be 6 digits.'),
   newCode: z.string().length(6).optional(), // E-posta değişimi için
   newPassword: z.string().min(6).optional()
 });
@@ -14,7 +14,7 @@ const confirmUpdateSchema = z.object({
 export default defineEventHandler(async (event) => {
   const contextUser = event.context.user;
   if (!contextUser) {
-    throw createError({ statusCode: 401, statusMessage: 'Oturum bulunamadı.' });
+    throw createError({ statusCode: 401, statusMessage: 'Session not found.' });
   }
 
   try {
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
     const parsed = confirmUpdateSchema.safeParse(body);
 
     if (!parsed.success) {
-      throw createError({ statusCode: 400, statusMessage: 'Geçersiz veri.' });
+      throw createError({ statusCode: 400, statusMessage: 'Invalid data.' });
     }
 
     const { type, code, newCode, newPassword } = parsed.data;
@@ -35,16 +35,16 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!user) {
-      throw createError({ statusCode: 400, statusMessage: 'Doğrulama kodu geçersiz veya süresi dolmuş.' });
+      throw createError({ statusCode: 400, statusMessage: 'Verification code is invalid or expired.' });
     }
 
     if (type === 'password') {
       if (user.updateCode !== code) {
-        throw createError({ statusCode: 400, statusMessage: 'Doğrulama kodu yanlış.' });
+        throw createError({ statusCode: 400, statusMessage: 'Verification code is incorrect.' });
       }
 
       if (!newPassword) {
-        throw createError({ statusCode: 400, statusMessage: 'Yeni şifre gereklidir.' });
+        throw createError({ statusCode: 400, statusMessage: 'New password is required.' });
       }
 
       const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -55,16 +55,16 @@ export default defineEventHandler(async (event) => {
         codeExpiresAt: null
       }).where(eq(users.id, user.id));
 
-      return { success: true, message: 'Şifreniz başarıyla güncellendi.' };
+      return { success: true, message: 'Your password has been successfully updated.' };
     }
 
     if (type === 'email') {
       if (user.updateCode !== code || user.updateCodeNew !== newCode) {
-        throw createError({ statusCode: 400, statusMessage: 'Girdiğiniz doğrulama kodlarından biri veya ikisi yanlış.' });
+        throw createError({ statusCode: 400, statusMessage: 'One or both of the verification codes you entered are incorrect.' });
       }
 
       if (!user.pendingEmail) {
-        throw createError({ statusCode: 400, statusMessage: 'Bekleyen bir e-posta güncellemesi bulunamadı.' });
+        throw createError({ statusCode: 400, statusMessage: 'No pending email update found.' });
       }
 
       await db.update(users).set({
@@ -75,11 +75,11 @@ export default defineEventHandler(async (event) => {
         codeExpiresAt: null
       }).where(eq(users.id, user.id));
 
-      return { success: true, message: 'E-posta adresiniz başarıyla güncellendi.' };
+      return { success: true, message: 'Your email address has been successfully updated.' };
     }
 
   } catch (error: any) {
     if (error.statusCode) throw error;
-    throw createError({ statusCode: 500, statusMessage: 'Sunucu hatası oluştu.' });
+    throw createError({ statusCode: 500, statusMessage: 'Internal server error occurred.' });
   }
 });

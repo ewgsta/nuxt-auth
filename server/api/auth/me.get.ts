@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   if (!contextUser || !contextUser.id) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Kullanıcı doğrulanamadı.'
+      statusMessage: 'User could not be authenticated.'
     });
   }
 
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     if (!user) {
       throw createError({
         statusCode: 404,
-        statusMessage: 'Kullanıcı bulunamadı.'
+        statusMessage: 'User not found.'
       });
     }
 
@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
   } catch (error: any) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Sunucu hatası oluştu.'
+      statusMessage: 'Internal server error occurred.'
     });
   }
 });

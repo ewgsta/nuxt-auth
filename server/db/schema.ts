@@ -11,7 +11,7 @@ export const users = pgTable('users', {
   verificationToken: text('verification_token'),
   resetPasswordToken: text('reset_password_token'),
   resetPasswordExpires: timestamp('reset_password_expires'),
-  updateCode: text('update_code'), // Profil güncellemeleri için 6 haneli kod (Eski mail / Şifre onayı)
+  updateCode: text('update_code'), // Profil güncellemeleri için 6 haneli kod (Eski mail / Password onayı)
   updateCodeNew: text('update_code_new'), // Yeni mail için kod
   pendingEmail: text('pending_email'), // Bekleyen yeni e-posta adresi
   codeExpiresAt: timestamp('code_expires_at'), // Doğrulama kodları son kullanma tarihi
