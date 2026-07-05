@@ -4,11 +4,23 @@ import { ref, onMounted } from 'vue'
 import { useToast } from '~/composables/useToast'
 
 const router = useRouter()
-const { showError } = useToast()
+const { showSuccess, showError } = useToast()
 
 const isMenuOpen = ref(false)
+const currentTab = ref('profile') // 'profile' veya 'settings'
 const user = ref(null)
 const isLoading = ref(true)
+
+// Ayarlar Formları İçin Değişkenler
+const currentPassword = ref('')
+const newPassword = ref('')
+const newEmail = ref('')
+const updateType = ref('') // 'password' veya 'email'
+const verificationStep = ref(false) // Kod girme adımında mıyız?
+const oldEmailCode = ref('')
+const newEmailCode = ref('')
+const passCode = ref('')
+const isActionLoading = ref(false)
 
 const fetchProfile = async () => {
   try {
@@ -34,6 +46,74 @@ const logout = async () => {
     console.error('Logout error', error)
   }
 }
+
+const resetForms = () => {
+  currentPassword.value = ''
+  newPassword.value = ''
+  newEmail.value = ''
+  oldEmailCode.value = ''
+  newEmailCode.value = ''
+  passCode.value = ''
+  updateType.value = ''
+  verificationStep.value = false
+}
+
+const requestUpdate = async (type) => {
+  if (!currentPassword.value) return showError('Lütfen mevcut şifrenizi girin.')
+  if (type === 'email' && !newEmail.value) return showError('Yeni e-posta adresinizi girmediniz.')
+  if (type === 'password' && newPassword.value.length < 6) return showError('Yeni şifre en az 6 karakter olmalıdır.')
+
+  isActionLoading.value = true
+  try {
+    const res = await $fetch('/api/auth/request-update', {
+      method: 'POST',
+      body: { 
+        type, 
+        currentPassword: currentPassword.value,
+        newEmail: type === 'email' ? newEmail.value : undefined 
+      }
+    })
+    
+    updateType.value = type
+    verificationStep.value = true
+    showSuccess(res.message)
+  } catch (err) {
+    showError(err.data?.statusMessage || 'İşlem başlatılamadı. Şifrenizi kontrol edin.')
+  } finally {
+    isActionLoading.value = false
+  }
+}
+
+const confirmUpdate = async () => {
+  if (updateType.value === 'password' && passCode.value.length !== 6) return showError('Lütfen 6 haneli kodu eksiksiz girin.')
+  if (updateType.value === 'email' && (oldEmailCode.value.length !== 6 || newEmailCode.value.length !== 6)) return showError('Lütfen her iki 6 haneli kodu da eksiksiz girin.')
+
+  isActionLoading.value = true
+  try {
+    const body = { type: updateType.value }
+    
+    if (updateType.value === 'password') {
+      body.code = passCode.value
+      body.newPassword = newPassword.value
+    } else {
+      body.code = oldEmailCode.value
+      body.newCode = newEmailCode.value
+    }
+
+    const res = await $fetch('/api/auth/confirm-update', {
+      method: 'POST',
+      body
+    })
+    
+    showSuccess(res.message)
+    resetForms()
+    fetchProfile() // Bilgileri yeniden çek
+  } catch (err) {
+    showError(err.data?.statusMessage || 'Kod hatalı veya süresi geçmiş.')
+  } finally {
+    isActionLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -43,8 +123,8 @@ const logout = async () => {
         <h2>Nuxt Auth</h2>
       </div>
       <nav class="sidebar-nav">
-        <a href="#" class="active">Profilim</a>
-        <a href="#">Ayarlar (Pek Yakında)</a>
+        <a href="#" :class="{ active: currentTab === 'profile' }" @click.prevent="currentTab = 'profile'; resetForms()">Profilim</a>
+        <a href="#" :class="{ active: currentTab === 'settings' }" @click.prevent="currentTab = 'settings'">Ayarlar</a>
       </nav>
       <div class="sidebar-footer">
         <button @click="logout" class="btn btn-text" style="color: var(--md-error); width: 100%; text-align: left;">Çıkış Yap</button>
@@ -56,58 +136,127 @@ const logout = async () => {
         <button class="menu-btn" @click="isMenuOpen = !isMenuOpen">
           <span class="menu-icon"></span>
         </button>
-        <div class="app-bar-title">Kontrol Paneli</div>
+        <div class="app-bar-title">{{ currentTab === 'profile' ? 'Kontrol Paneli' : 'Ayarlar' }}</div>
         <div class="app-bar-actions">
           <div class="avatar">{{ user.username.charAt(0).toUpperCase() }}</div>
         </div>
       </header>
       
       <div class="content-wrapper">
-        <h1 v-motion :initial="{opacity:0, y:-20}" :enter="{opacity:1, y:0, transition: {delay: 100}}">
-          Hoş Geldin, {{ user.displayName || user.username }}!
-        </h1>
-        <p style="color: var(--md-on-bg-medium);" v-motion :initial="{opacity:0, y:-20}" :enter="{opacity:1, y:0, transition: {delay: 200}}">
-          Profil bilgilerinizi aşağıdan görüntüleyebilirsiniz.
-        </p>
-        
-        <div class="stats-grid">
-          <div 
-            class="stat-card card" 
-            v-motion
-            :initial="{opacity:0, scale:0.8}"
-            :enter="{opacity:1, scale:1, transition: {delay: 300, type: 'spring'}}"
-          >
-            <h3>Kullanıcı Adı</h3>
-            <div class="stat-value" style="font-size: 20px;">@{{ user.username }}</div>
-          </div>
+        <!-- PROFİL SEKME -->
+        <div v-if="currentTab === 'profile'">
+          <h1 v-motion :initial="{opacity:0, y:-20}" :enter="{opacity:1, y:0, transition: {delay: 100}}">
+            Hoş Geldin, {{ user.displayName || user.username }}!
+          </h1>
+          <p style="color: var(--md-on-bg-medium);" v-motion :initial="{opacity:0, y:-20}" :enter="{opacity:1, y:0, transition: {delay: 200}}">
+            Profil bilgilerinizi aşağıdan görüntüleyebilirsiniz.
+          </p>
+          
+          <div class="stats-grid">
+            <div class="stat-card card" v-motion :initial="{opacity:0, scale:0.8}" :enter="{opacity:1, scale:1, transition: {delay: 300, type: 'spring'}}">
+              <h3>Kullanıcı Adı</h3>
+              <div class="stat-value" style="font-size: 20px;">@{{ user.username }}</div>
+            </div>
 
-          <div 
-            class="stat-card card" 
-            v-motion
-            :initial="{opacity:0, scale:0.8}"
-            :enter="{opacity:1, scale:1, transition: {delay: 400, type: 'spring'}}"
-          >
-            <h3>E-posta Adresi</h3>
-            <div class="stat-value" style="font-size: 20px;">{{ user.email }}</div>
-          </div>
+            <div class="stat-card card" v-motion :initial="{opacity:0, scale:0.8}" :enter="{opacity:1, scale:1, transition: {delay: 400, type: 'spring'}}">
+              <h3>E-posta Adresi</h3>
+              <div class="stat-value" style="font-size: 20px;">{{ user.email }}</div>
+            </div>
 
-          <div 
-            class="stat-card card" 
-            v-motion
-            :initial="{opacity:0, scale:0.8}"
-            :enter="{opacity:1, scale:1, transition: {delay: 500, type: 'spring'}}"
-          >
-            <h3>Hesap Durumu</h3>
-            <div class="stat-value" style="font-size: 20px; color: var(--md-secondary);">
-              Aktif
+            <div class="stat-card card" v-motion :initial="{opacity:0, scale:0.8}" :enter="{opacity:1, scale:1, transition: {delay: 500, type: 'spring'}}">
+              <h3>Hesap Durumu</h3>
+              <div class="stat-value" style="font-size: 20px; color: var(--md-secondary);">Aktif</div>
             </div>
           </div>
         </div>
+
+        <!-- AYARLAR SEKME -->
+        <div v-if="currentTab === 'settings'" v-motion :initial="{opacity:0}" :enter="{opacity:1}">
+          <h1>Hesap Ayarları</h1>
+          <p style="color: var(--md-on-bg-medium); margin-bottom: 32px;">Şifrenizi veya kayıtlı e-posta adresinizi bu ekrandan güvenle güncelleyebilirsiniz.</p>
+          
+          <div class="settings-grid">
+            <!-- Şifre Değiştirme Kartı -->
+            <div class="card settings-card">
+              <h3>Şifre Değiştir</h3>
+              
+              <div v-if="verificationStep && updateType === 'password'" v-motion :initial="{opacity:0}" :enter="{opacity:1}">
+                <p style="font-size: 14px; margin-bottom: 24px; color: var(--md-secondary);">Mevcut e-posta adresinize 6 haneli bir kod gönderildi. Lütfen işlemi onaylamak için kodu girin.</p>
+                <form @submit.prevent="confirmUpdate">
+                  <div class="input-group">
+                    <input type="text" id="passCode" v-model="passCode" placeholder=" " maxlength="6" required />
+                    <label for="passCode">Doğrulama Kodu</label>
+                  </div>
+                  <div style="display:flex; gap: 12px;">
+                    <button type="button" class="btn btn-text" @click="resetForms">İptal</button>
+                    <button type="submit" class="btn btn-primary" style="flex:1" :disabled="isActionLoading">
+                      <span v-if="!isActionLoading">Onayla</span>
+                      <span v-else>...</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <form v-else @submit.prevent="requestUpdate('password')" :class="{ 'disabled-form': verificationStep }">
+                <div class="input-group">
+                  <input type="password" id="curPass" v-model="currentPassword" placeholder=" " required :disabled="verificationStep" />
+                  <label for="curPass">Mevcut Şifreniz</label>
+                </div>
+                <div class="input-group">
+                  <input type="password" id="newPass" v-model="newPassword" placeholder=" " required :disabled="verificationStep" />
+                  <label for="newPass">Yeni Şifreniz</label>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="verificationStep || isActionLoading">Kod Gönder</button>
+              </form>
+            </div>
+
+            <!-- E-posta Değiştirme Kartı -->
+            <div class="card settings-card">
+              <h3>E-posta Değiştir</h3>
+              
+              <div v-if="verificationStep && updateType === 'email'" v-motion :initial="{opacity:0}" :enter="{opacity:1}">
+                <p style="font-size: 14px; margin-bottom: 24px; color: var(--md-secondary);">Güvenliğiniz için hem mevcut hem de yeni e-posta adresinize gönderilen kodları girin.</p>
+                <form @submit.prevent="confirmUpdate">
+                  <div class="input-group">
+                    <input type="text" id="oldEmailCode" v-model="oldEmailCode" placeholder=" " maxlength="6" required />
+                    <label for="oldEmailCode">Mevcut Maildeki Kod</label>
+                  </div>
+                  <div class="input-group">
+                    <input type="text" id="newEmailCode" v-model="newEmailCode" placeholder=" " maxlength="6" required />
+                    <label for="newEmailCode">Yeni Maildeki Kod</label>
+                  </div>
+                  <div style="display:flex; gap: 12px;">
+                    <button type="button" class="btn btn-text" @click="resetForms">İptal</button>
+                    <button type="submit" class="btn btn-primary" style="flex:1" :disabled="isActionLoading">
+                      <span v-if="!isActionLoading">Onayla</span>
+                      <span v-else>...</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <form v-else @submit.prevent="requestUpdate('email')" :class="{ 'disabled-form': verificationStep }">
+                <div class="input-group">
+                  <input type="email" id="newEmail" v-model="newEmail" placeholder=" " required :disabled="verificationStep" />
+                  <label for="newEmail">Yeni E-posta Adresi</label>
+                </div>
+                <div class="input-group">
+                  <input type="password" id="curPassForEmail" v-model="currentPassword" placeholder=" " required :disabled="verificationStep" />
+                  <label for="curPassForEmail">Mevcut Şifreniz (Onay için)</label>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="verificationStep || isActionLoading">Kod Gönder</button>
+              </form>
+            </div>
+
+          </div>
+        </div>
+
       </div>
     </main>
     
     <div class="overlay" v-if="isMenuOpen" @click="isMenuOpen = false"></div>
   </div>
+  
   <div v-else-if="isLoading" class="auth-container" style="display:flex; justify-content:center; align-items:center; height: 100vh;">
     <p>Yükleniyor...</p>
   </div>
@@ -239,15 +388,30 @@ const logout = async () => {
   margin: 0;
   max-width: none;
 }
-.stat-card h3 {
-  margin: 0 0 16px;
-  font-size: 14px;
-  color: var(--md-on-bg-medium);
-  font-weight: 500;
+
+.settings-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
 }
-.stat-value {
-  font-weight: 300;
-  color: var(--md-primary);
+
+.settings-card {
+  flex: 1;
+  min-width: 300px;
+  max-width: 450px;
+  margin: 0;
+}
+.settings-card h3 {
+  margin-top: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+}
+
+.disabled-form {
+  opacity: 0.3;
+  pointer-events: none;
 }
 
 @media (max-width: 768px) {
