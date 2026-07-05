@@ -30,6 +30,7 @@ const passwordStrength = computed(() => {
 })
 
 const errorMsg = ref('')
+const successMsg = ref('')
 
 const register = async () => {
   if (!acceptTerms.value) return alert("Şartları kabul etmelisiniz.")
@@ -37,9 +38,10 @@ const register = async () => {
   
   isLoading.value = true
   errorMsg.value = ''
+  successMsg.value = ''
   
   try {
-    await $fetch('/api/auth/register', {
+    const res = await $fetch('/api/auth/register', {
       method: 'POST',
       body: { 
         username: username.value, 
@@ -48,8 +50,15 @@ const register = async () => {
         displayName: displayName.value 
       }
     })
-    // Kayıt başarılıysa doğrudan login olur veya login sayfasına yönlendirilir
-    router.push('/dashboard')
+    
+    // Doğrulama maili gönderildi uyarısı gösterilecek, doğrudan yönlendirilmeyecek.
+    successMsg.value = res.message || 'Kayıt başarılı! Lütfen e-posta adresinizi doğrulayın.'
+    
+    // Kullanıcıya emaili okuması için süre tanıyıp login'e yönlendirebiliriz
+    setTimeout(() => {
+      router.push('/login')
+    }, 4000)
+
   } catch (err) {
     errorMsg.value = err.data?.statusMessage || err.data?.data?.issues?.[0]?.message || 'Kayıt işlemi başarısız oldu.'
   } finally {

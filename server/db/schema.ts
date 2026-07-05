@@ -6,7 +6,11 @@ export const users = pgTable('users', {
   displayName: text('display_name'),
   email: text('email').notNull().unique(),
   password: text('password').notNull(),
-  isActive: boolean('is_active').default(true),
+  isActive: boolean('is_active').default(false), // e-posta doğrulanana kadar false
+  emailVerifiedAt: timestamp('email_verified_at'),
+  verificationToken: text('verification_token'),
+  resetPasswordToken: text('reset_password_token'),
+  resetPasswordExpires: timestamp('reset_password_expires'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

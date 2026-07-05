@@ -3,7 +3,8 @@ import { users } from '~/server/db/schema';
 import { eq, or } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
-import { signToken } from '~/server/utils/jwt';
+import { randomBytes } from 'crypto';
+import { sendEmail } from '~/server/utils/email';
 
 const registerSchema = z.object({
   username: z.string().min(3, 'Kullanıcı adı en az 3 karakter olmalıdır.').max(30),
@@ -27,7 +28,6 @@ export default defineEventHandler(async (event) => {
 
     const { username, email, password, displayName } = parsed.data;
 
-    // E-posta veya kullanıcı adı kontrolü
     const existingUser = await db.query.users.findFirst({
       where: or(eq(users.email, email), eq(users.username, username))
     });
@@ -39,16 +39,19 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    // Şifre hash'leme
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
+    
+    // Doğrulama token'ı oluşturma
+    const verificationToken = randomBytes(32).toString('hex');
 
-    // Kullanıcıyı veritabanına ekleme
     const [newUser] = await db.insert(users).values({
       username,
       email,
       password: hashedPassword,
       displayName: displayName || null,
+      verificationToken,
+      isActive: false // E-posta doğrulanana kadar pasif
     }).returning({
       id: users.id,
       username: users.username,
@@ -56,18 +59,28 @@ export default defineEventHandler(async (event) => {
       displayName: users.displayName
     });
 
-    // JWT Token oluşturma
-    const token = signToken({ id: newUser.id, username: newUser.username });
+    // Doğrulama e-postası gönderme işlemi (EmailThing)
+    // Sitenizin Base URL'sini kendi domaininize göre ayarlamalısınız (.env den alabilirsiniz)
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
     
-    // Token'ı HTTP-Only cookie olarak ayarlama (Güvenlik için)
-    setCookie(event, 'auth_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 7, // 7 gün
-      path: '/'
-    });
+    const emailSubject = 'Nuxt Auth - E-posta Adresinizi Doğrulayın';
+    const emailHtml = `
+      <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; text-align: center;">
+        <h2>Hoş Geldiniz, ${username}!</h2>
+        <p>Kayıt olduğunuz için teşekkürler. Lütfen aşağıdaki butona tıklayarak e-posta adresinizi doğrulayın.</p>
+        <a href="${verifyUrl}" style="display: inline-block; padding: 12px 24px; margin-top: 20px; background-color: #bb86fc; color: #000; text-decoration: none; border-radius: 4px; font-weight: bold;">E-postamı Doğrula</a>
+        <p style="margin-top: 30px; font-size: 12px; color: #888;">Bu e-postayı siz talep etmediyseniz, görmezden gelebilirsiniz.</p>
+      </div>
+    `;
+    
+    await sendEmail(email, emailSubject, emailHtml);
 
-    return { success: true, user: newUser };
+    return { 
+      success: true, 
+      message: 'Kayıt başarılı. Lütfen e-posta adresinize gönderilen doğrulama bağlantısına tıklayın.',
+      user: newUser 
+    };
   } catch (error: any) {
     if (error.statusCode) throw error;
     throw createError({

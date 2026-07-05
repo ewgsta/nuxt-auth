@@ -1,0 +1,376 @@
+import {
+    db,
+    DefaultDomain,
+    Email,
+    EmailAttachments,
+    EmailRecipient,
+    EmailSender,
+    Mailbox,
+    MailboxAlias,
+    MailboxCategory,
+    Stats,
+    TempAlias
+} from "@/db";
+import { notifyMailbox } from "@/utils/notifications";
+import { uploadFile } from "@/utils/s3";
+import { todayDate } from "@/utils/tools";
+import { storageLimit } from "@emailthing/const/limits";
+import { createId } from "@paralleldrive/cuid2";
+import { and, eq, gt, sql } from "drizzle-orm";
+import PostalMime from "postal-mime";
+import Turndown from "turndown";
+import { getTokenMailbox } from "../tools";
+import { WEB_URL } from "@emailthing/const/urls";
+
+export async function POST(request: Request) {
+    console.log("receive-email!");
+    console.time("receive-email");
+    const { searchParams } = new URL(request.url);
+
+    const { email: rawEmail, from, to, category_id: _categoryId } = (await request.json()) as Record<string, string>;
+    if (!(rawEmail && from && to)) {
+        return Response.json({ error: "missing required fields" }, { status: 400 });
+    }
+
+    const parser = new PostalMime();
+    const email = await parser.parse(rawEmail as string);
+    email.html = email.html?.replaceAll("\u0000", "");
+    email.text = email.text?.replaceAll("\u0000", "");
+
+    const mailboxResult = await getMailbox({
+        internal: searchParams.has("internal"),
+        zone: searchParams.get("zone") as string,
+        auth: request.headers.get("x-auth") as string,
+        to,
+        headers: request.headers,
+    });
+    if (!mailboxResult) {
+        return new Response("Unauthorized", { status: 401 });
+    }
+
+    const { mailboxId, tempId } = mailboxResult;
+
+    if (!mailboxId) {
+        return new Response("Mailbox not found", { status: 400 });
+    }
+
+    if (email.messageId) {
+        // work out if the email is already in the database (using Message-ID)
+        const [existingEmail] = await db
+            .select({ id: Email.id })
+            .from(Email)
+            .where(
+                and(
+                    eq(Email.mailboxId, mailboxId),
+                    eq(Email.givenId, email.messageId),
+                    eq(Email.isDeleted, false)
+                )
+            )
+            .limit(1);
+        if (existingEmail) {
+            console.info("Email already exists, no need to add!");
+            return Response.json({
+                success: true,
+                id: existingEmail.id,
+                emailId: existingEmail.id,
+                email_id: existingEmail.id,
+                alreadyExists: true,
+                already_exists: true,
+            });
+        }
+    }
+
+    // get storage used and see if over limit
+    const [mailbox] = await db
+        .select({ storageUsed: Mailbox.storageUsed, plan: Mailbox.plan })
+        .from(Mailbox)
+        .where(
+            and(
+                eq(Mailbox.id, mailboxId),
+                eq(Mailbox.isDeleted, false)
+            )
+        )
+        .limit(1);
+
+    const limit = storageLimit[mailbox?.plan ?? "FREE"];
+    if ((mailbox?.storageUsed ?? 0) > limit) {
+        // todo: send email to user to warn them about unreceived emails
+        // (and they can upgrade to pro to get more storage or delete some emails to free up space)
+        const [mainAlias] = await db
+            .select({ address: MailboxAlias.alias, name: MailboxAlias.name })
+            .from(MailboxAlias)
+            .where(and(
+                eq(MailboxAlias.mailboxId, mailboxId),
+                eq(MailboxAlias.default, true),
+                eq(MailboxAlias.isDeleted, false)
+            ))
+            .limit(1)
+        await emailOverLimit(mailboxId, limit, mainAlias, email.from?.address);
+        return new Response("Mailbox over storage limit", { status: 400 });
+    }
+
+    const emailSize = new Blob([rawEmail]).size;
+    const references = new Set<string>();
+    if (email.inReplyTo) references.add(email.inReplyTo);
+    for (const id of email.references?.split(" ") ?? []) references.add(id);
+
+    // only set category if it exists for this mailbox
+    let categoryId = null;
+    if (_categoryId) {
+        const [category] = await db
+            .select({ id: MailboxCategory.id })
+            .from(MailboxCategory)
+            .where(and(eq(MailboxCategory.id, _categoryId), eq(MailboxCategory.mailboxId, mailboxId), eq(MailboxCategory.isDeleted, false)))
+            .limit(1);
+        if (category) categoryId = category.id;
+    }
+
+    const emailId = createId();
+    await db.batchUpdate([
+        db.insert(Email).values({
+            id: emailId,
+            raw: "s3",
+            subject: email.subject,
+            body: emailContent(email),
+            html: email.html,
+            snippet: email.text ? slice(email.text, 200) : null,
+            mailboxId,
+            replyTo: email.replyTo?.[0]?.address,
+            size: emailSize,
+            tempId,
+            givenId: email.messageId,
+            givenReferences: references.size ? [...references] : undefined,
+            categoryId,
+        }),
+
+        (email.to?.length || email.cc?.length) ? db.insert(EmailRecipient).values([
+            ...(email.to?.map((to) => ({
+                emailId: emailId,
+                address: to.address!,
+                name: to.name,
+                cc: false,
+            })) ?? []),
+
+            ...(email.cc?.map((cc) => ({
+                emailId: emailId,
+                address: cc.address!,
+                name: cc.name,
+                cc: true,
+            })) ?? []),
+        ]) : db.select({ id: sql`1` }).from(Mailbox).where(eq(Mailbox.id, mailboxId)), // dummy query to keep batchUpdate happy when there are no recipients
+
+        db.insert(EmailSender).values({
+            emailId: emailId,
+            address: email.from?.address ?? "",
+            name: email.from?.name,
+        }),
+
+        // increment the mailbox storage used
+        db
+            .update(Mailbox)
+            .set({
+                storageUsed: sql`${Mailbox.storageUsed} + ${emailSize}`,
+            })
+            .where(eq(Mailbox.id, mailboxId)),
+
+        // stats!
+        db
+            .insert(Stats)
+            .values({
+                time: todayDate(),
+                value: 1,
+                type: "receive-email",
+            })
+            .onConflictDoUpdate({
+                target: [Stats.time, Stats.type],
+                set: { value: sql`${Stats.value} + 1` },
+            }),
+    ]);
+
+    try {
+        // save the email to s3
+        const upload = await uploadFile({
+            key: `${mailboxId}/${emailId}/email.eml`,
+            buffer: Buffer.from(rawEmail),
+            contentType: "message/rfc822",
+        });
+    } catch (e) {
+        console.error(e);
+    }
+
+    for (const attachment of email.attachments) {
+        const name = attachment.filename || attachment.contentId || attachment.mimeType || createId();
+
+        const attContent = typeof attachment.content === "string" ? Buffer.from(attachment.content) : attachment.content;
+        const attId = createId();
+        await db
+            .insert(EmailAttachments)
+            .values({
+                id: attId,
+                emailId: emailId,
+                filename: encodeURIComponent(name),
+                title: name,
+                mimeType: attachment.mimeType,
+                size: attContent.byteLength,
+            })
+            .execute();
+
+        try {
+            const upload = await uploadFile({
+                key: `${mailboxId}/${emailId}/${attId}/${encodeURIComponent(name)}`,
+                buffer: attContent,
+                contentType: attachment.mimeType,
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    }
+    await notifyMailbox(mailboxId, {
+        title: email.from?.address ?? "Unknown Sender",
+        body: email.subject ? slice(email.subject, 200) : undefined,
+        url: `/mail/${mailboxId}/${emailId}`,
+    });
+
+    console.timeEnd("receive-email");
+    return Response.json({
+        success: true,
+        id: emailId,
+        emailId,
+        email_id: emailId,
+        mailbox_id: mailboxId,
+        alreadyExists: false,
+        already_exists: false,
+        url: `${WEB_URL}/mail/${mailboxId}/${emailId}`,
+    });
+}
+
+/** Cleans email addresses: `a.b+c@d.com` -> `ab@d.com` */
+const cleanEmail = (email: string): string =>
+    email.replace(/^[^@]+/, (username) =>
+        username.split('+')[0]?.replace(/\./g, '') || username
+    );
+
+async function getMailbox({ internal, zone, auth, to, headers }: { internal: boolean; zone: string; auth: string; to: string; headers: Headers }) {
+    // work out which mailbox to put it in
+
+    if (!internal) {
+        // it must be custom domain (so check the token)
+        const mailboxId = await getTokenMailbox(headers);
+        if (!mailboxId) return null;
+        return { mailboxId };
+    }
+
+    // check if its a default domain (and if so, check the alias and get the mailbox id)
+    const [defaultDomain] = await db
+        .select({ id: DefaultDomain.id, tempDomain: DefaultDomain.tempDomain })
+        .from(DefaultDomain)
+        .where(
+            and(
+                eq(sql`lower(${DefaultDomain.domain})`, sql`lower(${zone})`),
+                eq(DefaultDomain.authKey, auth),
+                eq(DefaultDomain.isDeleted, false)
+            )
+        )
+        .limit(1);
+    if (!defaultDomain) return null;
+
+    const [alias] = defaultDomain.tempDomain
+        ? await db
+            .select({ mailboxId: TempAlias.mailboxId, id: TempAlias.id })
+            .from(TempAlias)
+            .where(
+                and(
+                    eq(sql`lower(${TempAlias.alias})`, sql`lower(${cleanEmail(to)})`),
+                    gt(TempAlias.expiresAt, new Date()),
+                    eq(TempAlias.isDeleted, false)
+                )
+            )
+            .limit(1)
+        : await db
+            .select({ mailboxId: MailboxAlias.mailboxId, id: MailboxAlias.id })
+            .from(MailboxAlias)
+            .where(
+                and(
+                    eq(sql`lower(${MailboxAlias.alias})`, sql`lower(${cleanEmail(to)})`),
+                    eq(MailboxAlias.isDeleted, false)
+                )
+            )
+            .limit(1);
+
+    if (defaultDomain.tempDomain) {
+        return { mailboxId: alias?.mailboxId, tempId: alias?.id };
+    }
+    return { mailboxId: alias?.mailboxId };
+}
+
+function slice(text: string, length: number) {
+    return text.slice(0, length) + (length < text.length ? "…" : "");
+}
+
+function emailContent({ text, html }: { text?: string; html?: string }) {
+    if (text === "\n") text = undefined;
+    if (text) return text;
+    if (!html) return "(no body)";
+
+    const h = html
+        .replace(/<(head|style|script|title)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
+        .replace(/<(meta|link)\b[^>]*\/?>/gi, "");
+
+    const _text = new Turndown().turndown((h)).replaceAll(/\[(https?:\/\/[^\]]+)\]\(\1\)/g, "$1");
+
+    return `<!-- Converted markdown from HTML -->\n${_text}`;
+}
+
+const bytesInMb = (bytes: number) => (Math.ceil((bytes / 1e6) * 10) / 10).toLocaleString() + "MB";
+async function emailOverLimit(mailboxId: string, maxPlanStorage: number, mainAlias: { address: string, name: string | null } | null = null, senderAddress: string = "(unknown sender)") {
+    const emailId = createId();
+
+    const title = "Mailbox Full: Incoming email blocked";
+    const body = `
+### Hi ${mainAlias?.name || mainAlias?.address.split("@")[0] || "there"},
+
+You've reached your storage limit of **${bytesInMb(maxPlanStorage)}**. Because of this, a new message from **${senderAddress}** was just bounced back to the sender and was not saved.
+
+To resume service, please:
+1. **Delete** large attachments or old threads.
+2. ~~**Upgrade** to a higher tier for a larger limit.~~ 
+   (this isn't implemented yet, but if you need more storage, please reach out to support!)
+
+[View your storage →](https://emailthing.app/mail/${mailboxId}/config#storage)
+
+Best regards,
+EmailThing System
+`.trim();
+    const preview = `Your mailbox is full. A new message from ${senderAddress} was blocked. Please free up some space to receive new emails.`;
+
+    await db.batchUpdate([
+        db.insert(Email).values({
+            id: emailId,
+            subject: title,
+            body,
+            snippet: preview,
+            mailboxId,
+            size: 0,
+            raw: "system"
+        }),
+        db.insert(EmailSender).values({
+            emailId: emailId,
+            address: "system@emailthing.app",
+            name: "EmailThing",
+        }),
+        mainAlias ? db.insert(EmailRecipient).values({
+            emailId: emailId,
+            address: mainAlias.address,
+            name: mainAlias.name,
+            cc: false,
+        }) : db.select({ id: sql`1` }).from(Mailbox).where(eq(Mailbox.id, mailboxId)), // dummy query to keep batchUpdate happy when there are no recipients
+    ])
+
+    await notifyMailbox(mailboxId, {
+        title,
+        body: preview,
+        url: `/mail/${mailboxId}/${emailId}`,
+    });
+}
+
+export const GET = new Response("GET method not allowed. Use POST instead.", { status: 405 });
