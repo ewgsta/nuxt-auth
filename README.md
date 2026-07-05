@@ -1,57 +1,55 @@
 # Nuxt Auth Boilerplate
 
-Merhaba! Bu proje, Nuxt kullanarak yeni bir uygulamaya başlarken tekrar tekrar auth (kimlik doğrulama) sistemi yazmamak için hazırladığım bir başlangıç şablonu. İçerisinde modern bir web uygulamasının ihtiyaç duyabileceği neredeyse tüm temel üyelik işlevleri arka uç ve ön yüzüyle birlikte hazır durumda.
+Hey! This is a starter template I put together using Nuxt so I wouldn't have to keep rewriting an auth (authentication) system from scratch every time I start a new app. It comes with almost all the core membership features a modern web app might need, both on the backend and the frontend.
 
-Tasarım tarafında dışarıdan ağır bir UI kütüphanesi yüklemek yerine, saf CSS ile **Google Material Design 2 Koyu Tema** dinamiklerini kurguladım. Animasyonlar için de VueUse Motion kullanarak geçişleri yumuşattım.
+## What's Included?
 
-## Neler Var?
+- **Sign Up & Login:** Data validation with Zod, secure password storage with Bcrypt.
+- **JWT Session Management:** Secure, HTTP-Only cookie-based session management to protect against theft.
+- **Email Verification:** Account activation via a link sent after registration, powered by [EmailThing](https://emailthing.app/home).
+- **Forgot Password:** Secure password reset request and token-based new password flow.
+- **Profile Updates:** Secure password and email changes from the dashboard after verifying the current password, using 6-digit codes sent to the old/new email addresses.
+- **Custom Notifications:** A custom toast notification system that floats on screen, instead of ugly browser alerts.
 
-- **Kayıt ve Giriş:** Zod ile veri doğrulama, Bcrypt ile güvenli şifre saklama.
-- **JWT Oturum Yönetimi:** Çalınmalara karşı HTTP-Only cookie tabanlı güvenli oturum yönetimi.
-- **E-posta Doğrulama:** EmailThing altyapısı kullanarak kayıt sonrası link ile hesap aktifleştirme.
-- **Şifremi Unuttum:** Güvenli şifre sıfırlama talebi ve token tabanlı yeni şifre belirleme akışı.
-- **Profil Güncelleme:** Dashboard üzerinden mevcut şifre doğrulandıktan sonra, eski/yeni maillere giden 6 haneli kodlarla güvenli şifre ve e-posta değişimi.
-- **Özel Bildirimler:** Çirkin tarayıcı alert'leri yerine ekranda süzülen özel Toast bildirim sistemi.
-
-## Teknoloji Yığını
+## Tech Stack
 
 - **Framework:** Nuxt 4 (Vue 3)
-- **Veritabanı:** PostgreSQL (Drizzle ORM)
-- **Güvenlik:** JSON Web Token (JWT), Bcrypt, Zod
-- **Animasyon:** @vueuse/motion
-- **Mail Servisi:** EmailThing API
+- **Database:** PostgreSQL (Drizzle ORM)
+- **Security:** JSON Web Token (JWT), Bcrypt, Zod
+- **Animation:** @vueuse/motion
+- **Mail Service:** EmailThing API
 
-## Kurulum
+## Setup
 
-Projeyi kendi bilgisayarınızda çalıştırmak için şu adımları izleyebilirsiniz:
+Follow these steps to run the project on your own machine:
 
-1. Bağımlılıkları yükleyin:
+1. Install dependencies:
 ```bash
 yarn install
 ```
 
-2. Proje dizininde bir `.env` dosyası oluşturun ve aşağıdaki değişkenleri kendinize göre doldurun:
+2. Create a `.env` file in the project directory and fill in the following variables:
 ```env
-# Veritabanı bağlantınız (Örn: Supabase, Neon veya lokal Postgres)
-DATABASE_URL="postgresql://kullanici:sifre@localhost:5432/nuxt_auth"
+# Your database connection (e.g. Supabase, Neon, or local Postgres)
+DATABASE_URL="postgresql://user:password@localhost:5432/nuxt_auth"
 
-# Oturum şifrelemesi için rastgele bir metin
-JWT_SECRET="buraya-rastgele-uzun-bir-sifre-yazin"
+# A random string for session encryption
+JWT_SECRET="put-a-long-random-string-here"
 
-# Doğrulama mailleri için EmailThing bilgileri
-EMAILTHING_TOKEN="et__sizin_tokeniniz"
-EMAILTHING_FROM="no-reply@sizin-domaininiz.com"
+# EmailThing credentials for verification emails
+EMAILTHING_TOKEN="et__your_token"
+EMAILTHING_FROM="no-reply@your-domain.com"
 
-# Uygulamanın çalıştığı adres (Maillerdeki tıklama linkleri için gerekli)
+# The address the app runs on (needed for links in emails)
 BASE_URL="http://localhost:3000"
 ```
 
-3. Veritabanı tablolarını oluşturun (Drizzle otomatik halledecek):
+3. Create the database tables (Drizzle will handle this automatically):
 ```bash
 yarn db:push
 ```
 
-4. Geliştirme sunucusunu başlatın:
+4. Start the development server:
 ```bash
 yarn dev
 ```
