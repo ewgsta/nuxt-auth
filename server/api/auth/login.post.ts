@@ -1,5 +1,5 @@
 import { db } from '../../db';
-import { users } from '../../db/schema';
+import { users, securitySettings } from '../../db/schema';
 import { eq, or } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
@@ -25,43 +25,34 @@ export default defineEventHandler(async (event) => {
 
     const { identifier, password } = parsed.data;
 
-    // Kullanıcıyı E-posta veya Kullanıcı adına göre bul
+    // Fetch user and relations
     const user = await db.query.users.findFirst({
-      where: or(eq(users.email, identifier), eq(users.username, identifier))
+      where: or(eq(users.email, identifier), eq(users.username, identifier)),
+      with: { securitySettings: true }
     });
 
     if (!user) {
-      throw createError({ 
-        statusCode: 401, 
-        statusMessage: 'Invalid credentials.' 
-      });
+      throw createError({ statusCode: 401, statusMessage: 'Invalid credentials.' });
     }
 
-    // Passwordyi doğrula
     const isPasswordValid = await bcrypt.compare(password, user.password);
     
     if (!isPasswordValid) {
-      throw createError({ 
-        statusCode: 401, 
-        statusMessage: 'Invalid credentials.' 
-      });
+      throw createError({ statusCode: 401, statusMessage: 'Invalid credentials.' });
     }
 
     if (!user.isActive) {
-      throw createError({ 
-        statusCode: 403, 
-        statusMessage: 'Please verify your account (email address) before logging in.' 
-      });
+      throw createError({ statusCode: 403, statusMessage: 'Please verify your account (email address) before logging in.' });
     }
 
-    if (user.twoFactorEnabled) {
-      // 2FA requires an intermediate state
+    // Checking relational 2FA
+    if (user.securitySettings?.twoFactorEnabled) {
       const tempToken = signToken({ pendingUserId: user.id }, '15m');
       
       setCookie(event, 'auth_pending_2fa', tempToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 15, // 15 mins
+        maxAge: 60 * 15,
         path: '/'
       });
 
@@ -72,14 +63,16 @@ export default defineEventHandler(async (event) => {
       };
     }
 
-    // JWT Token oluşturma
+    // Normal Login
     const token = signToken({ id: user.id, username: user.username });
     
-    // Token'ı HTTP-Only cookie olarak ayarlama
+    // Update last login
+    await db.update(securitySettings).set({ lastLoginAt: new Date() }).where(eq(securitySettings.userId, user.id));
+
     setCookie(event, 'auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 7, // 7 gün
+      maxAge: 60 * 60 * 24 * 7,
       path: '/'
     });
 
@@ -94,9 +87,6 @@ export default defineEventHandler(async (event) => {
     };
   } catch (error: any) {
     if (error.statusCode) throw error;
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Internal server error occurred.'
-    });
+    throw createError({ statusCode: 500, statusMessage: 'Internal server error occurred.' });
   }
 });

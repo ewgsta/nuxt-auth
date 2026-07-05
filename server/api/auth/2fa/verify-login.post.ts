@@ -1,6 +1,6 @@
-import { authenticator } from 'otplib';
+import { authenticator } from '@otplib/preset-default';
 import { db } from '../../../db';
-import { users } from '../../../db/schema';
+import { users, securitySettings } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
 import { verifyToken, signToken } from '../../../utils/jwt';
 
@@ -28,13 +28,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: 'Invalid session.' });
   }
 
-  const [user] = await db.select().from(users).where(eq(users.id, decoded.pendingUserId)).limit(1);
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, decoded.pendingUserId),
+    with: { securitySettings: true }
+  });
 
-  if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+  if (!user || !user.securitySettings?.twoFactorEnabled || !user.securitySettings?.twoFactorSecret) {
     throw createError({ statusCode: 400, statusMessage: '2FA is not enabled for this user.' });
   }
 
-  const isValid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
+  const isValid = authenticator.verify({ token: code, secret: user.securitySettings.twoFactorSecret });
 
   if (!isValid) {
     throw createError({ statusCode: 400, statusMessage: 'Invalid verification code.' });
@@ -52,6 +55,9 @@ export default defineEventHandler(async (event) => {
 
   // Clear pending cookie
   setCookie(event, 'auth_pending_2fa', '', { maxAge: 0, path: '/' });
+
+  // Update last login
+  await db.update(securitySettings).set({ lastLoginAt: new Date() }).where(eq(securitySettings.userId, user.id));
 
   return {
     success: true,

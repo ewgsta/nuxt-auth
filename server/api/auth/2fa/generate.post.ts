@@ -1,8 +1,8 @@
-import { authenticator } from 'otplib';
+import { authenticator } from '@otplib/preset-default';
 import QRCode from 'qrcode';
 import { eq } from 'drizzle-orm';
 import { db } from '../../../db';
-import { users } from '../../../db/schema';
+import { securitySettings } from '../../../db/schema';
 import { requireUser } from '../../../utils/auth';
 
 export default defineEventHandler(async (event) => {
@@ -16,8 +16,9 @@ export default defineEventHandler(async (event) => {
   const otpauthUrl = authenticator.keyuri(user.email, 'Nuxt Auth App', secret);
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
 
-  // Veritabanına geçici olarak secret'ı kaydediyoruz ama henüz aktif değil (twoFactorEnabled = false)
-  await db.update(users).set({ twoFactorSecret: secret }).where(eq(users.id, user.id));
+  await db.update(securitySettings)
+    .set({ twoFactorSecret: secret })
+    .where(eq(securitySettings.userId, user.id));
 
   return {
     secret,

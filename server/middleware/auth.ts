@@ -1,26 +1,27 @@
 import { verifyToken } from '../utils/jwt';
 
 // Sadece giriş yapılmadan da erişilebilecek 'public' API yolları
+// Artık daha modüler ve Passkey/2FA Login yollarını da kapsıyor
 const publicAuthRoutes = [
   '/api/auth/login',
   '/api/auth/register',
   '/api/auth/verify-email',
   '/api/auth/forgot-password',
   '/api/auth/reset-password',
+  '/api/auth/2fa/verify-login', 
+  '/api/auth/passkey/authentication-options',
+  '/api/auth/passkey/verify-authentication'
 ];
 
 export default defineEventHandler((event) => {
   const url = getRequestURL(event);
   const pathname = url.pathname;
 
-  // Eğer bu bir API isteğiyse
   if (pathname.startsWith('/api')) {
-    // Eğer herkese açık auth yollarından biriyse, JWT aramaya gerek yok.
     if (publicAuthRoutes.includes(pathname)) {
-      return; // Middleware'i atla
+      return; 
     }
 
-    // Geri kalan tüm API yolları (/api/auth/me, /api/auth/request-update vb. dahil) korumalıdır
     const token = getCookie(event, 'auth_token');
     
     if (!token) {
@@ -30,7 +31,15 @@ export default defineEventHandler((event) => {
       });
     }
 
-    const decoded = verifyToken(token);
+    let decoded;
+    try {
+       decoded = verifyToken(token);
+    } catch(err) {
+       throw createError({
+        statusCode: 401,
+        message: 'Invalid or expired session.'
+      });
+    }
     
     if (!decoded) {
       throw createError({
@@ -39,7 +48,8 @@ export default defineEventHandler((event) => {
       });
     }
 
-    // Doğrulanmış kullanıcı bilgisini request context'ine ekle
-    event.context.user = decoded;
+    event.context.user = {
+      userId: decoded.id // requireUser in utils/auth expects userId
+    };
   }
 });

@@ -2,8 +2,8 @@ import { verifyRegistrationResponse } from '@simplewebauthn/server';
 import { db } from '../../../db';
 import { passkeys } from '../../../db/schema';
 import { requireUser } from '../../../utils/auth';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
 
-const rpName = 'Nuxt Auth App';
 const rpID = process.env.URL ? new URL(process.env.URL).hostname : 'localhost';
 const origin = process.env.URL || `http://localhost:3000`;
 
@@ -31,15 +31,26 @@ export default defineEventHandler(async (event) => {
   const { verified, registrationInfo } = verification;
 
   if (verified && registrationInfo) {
-    const { credentialPublicKey, credentialID, counter } = registrationInfo;
+    const { credential } = registrationInfo;
+    
+    if (!credential || !credential.id) {
+       throw createError({ statusCode: 500, statusMessage: 'Missing credential info in verification.' });
+    }
 
-    // TODO: Consider user provided distinct device names.
+    // Doğrudan browser'dan gelen raw `id` string (base64url formatında) body içerisinde mevcuttur.
+    // Drizzle veritabanında arama yaparken bu string `body.id` kullanılacağından bunu tutuyoruz.
+    const credentialIdStr = body.id; 
+    
+    const credentialPublicKeyB64 = isoBase64URL.fromBuffer(credential.publicKey);
+    
+    const initialCounter = credential.counter ?? 0;
+
     await db.insert(passkeys).values({
       userId: user.id,
       webauthnUserId: user.id,
-      credentialId: Buffer.from(credentialID).toString('base64url'),
-      credentialPublicKey: Buffer.from(credentialPublicKey).toString('base64url'),
-      counter: counter.toString(),
+      credentialId: credentialIdStr,
+      credentialPublicKey: credentialPublicKeyB64,
+      counter: initialCounter.toString(),
       transports: body.response.transports,
       deviceName: 'My Authenticator',
     });

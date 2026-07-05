@@ -1,7 +1,7 @@
-import { authenticator } from 'otplib';
+import { authenticator } from '@otplib/preset-default';
 import { eq } from 'drizzle-orm';
 import { db } from '../../../db';
-import { users } from '../../../db/schema';
+import { securitySettings } from '../../../db/schema';
 import { requireUser } from '../../../utils/auth';
 
 export default defineEventHandler(async (event) => {
@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid verification code' });
   }
 
-  await db.update(users).set({ twoFactorEnabled: true }).where(eq(users.id, user.id));
+  await db.update(securitySettings).set({ twoFactorEnabled: true }).where(eq(securitySettings.userId, user.id));
 
   return { message: '2FA enabled successfully' };
 });

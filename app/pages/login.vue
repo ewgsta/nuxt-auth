@@ -78,7 +78,7 @@ const loginWithPasskey = async () => {
   isPasskeyLoading.value = true
   try {
     // 1. Get authentication options from server
-    const optionsResp = await $fetch('/api/auth/passkey/generate-authentication-options', {
+    const optionsResp = await $fetch('/api/auth/passkey/authentication-options', {
         method: 'POST',
         // Optional: send identifier if you want a flow where user types username first
         body: { identifier: identifier.value || undefined }

@@ -31,6 +31,7 @@ const twoFactorSecretCode = ref('')
 const twoFactorInputCode = ref('')
 const passwordToDisable2fa = ref('')
 const passkeys = ref([])
+const isFetchingPasskeys = ref(false)
 
 const fetchProfile = async () => {
   try {
@@ -41,6 +42,18 @@ const fetchProfile = async () => {
     router.push('/login')
   } finally {
     isLoading.value = false
+  }
+}
+
+const fetchPasskeys = async () => {
+  isFetchingPasskeys.value = true;
+  try {
+     const res = await $fetch('/api/auth/passkey');
+     passkeys.value = res.passkeys || [];
+  } catch(error) {
+     console.error('Failed to load passkeys', error);
+  } finally {
+     isFetchingPasskeys.value = false;
   }
 }
 
@@ -76,6 +89,9 @@ const resetForms = () => {
 const changeTab = (tab) => {
     currentTab.value = tab;
     resetForms();
+    if(tab === 'security') {
+        fetchPasskeys();
+    }
 }
 
   const requestUpdate = async (type) => {
@@ -213,7 +229,7 @@ const registerPasskey = async () => {
         
         if(verificationResp && verificationResp.verified) {
              showSuccess('Passkey registered successfully!');
-             // Ideally refetch user/passkeys list here if we display them
+             fetchPasskeys(); // Refresh list automatically
         }
         
     } catch (error) {
@@ -223,6 +239,22 @@ const registerPasskey = async () => {
     }
 }
 
+const removePasskey = async (passkeyId) => {
+    try {
+        await $fetch(`/api/auth/passkey/${passkeyId}`, { method: 'DELETE' });
+        showSuccess(t('dashboard.security.passkey.removing'));
+        fetchPasskeys();
+    } catch(err) {
+        showError(err.data?.statusMessage || 'Failed to remove passkey');
+    }
+}
+
+const formatDate = (dateString) => {
+    if(!dateString) return 'Never';
+    return new Date(dateString).toLocaleDateString(undefined, { 
+        year: 'numeric', month: 'short', day: 'numeric' 
+    });
+}
 </script>
 
 <template>
@@ -421,14 +453,38 @@ const registerPasskey = async () => {
             </div>
 
             <!-- Passkey Kartı -->
-            <div class="card settings-card">
+            <div class="card settings-card" style="width: 100%; max-width: none;">
               <h3>{{ t('dashboard.security.passkey.title') }}</h3>
               <p style="font-size: 14px; margin-bottom: 16px; color: var(--md-on-bg-medium);">{{ t('dashboard.security.passkey.description') }}</p>
               
-              <button type="button" class="btn btn-primary" @click="registerPasskey" :disabled="isActionLoading">
+              <button type="button" class="btn btn-primary" style="margin-bottom: 24px;" @click="registerPasskey" :disabled="isActionLoading">
                   <span v-if="!isActionLoading">{{ t('dashboard.security.passkey.add') }}</span>
                   <span v-else>{{ t('dashboard.security.passkey.adding') }}</span>
               </button>
+
+              <div class="passkey-list">
+                 <h4 style="margin-top: 0; color: var(--md-on-bg); font-weight: 500;">{{ t('dashboard.security.passkey.listTitle') }}</h4>
+                 
+                 <div v-if="isFetchingPasskeys" style="color: var(--md-on-bg-medium); font-size: 14px; padding: 12px 0;">
+                    Loading passkeys...
+                 </div>
+                 
+                 <div v-else-if="passkeys.length === 0" style="color: var(--md-on-bg-medium); font-size: 14px; padding: 12px 0;">
+                    {{ t('dashboard.security.passkey.noPasskeys') }}
+                 </div>
+
+                 <div v-else class="passkey-items">
+                    <div v-for="pk in passkeys" :key="pk.id" class="passkey-item">
+                       <div class="passkey-info">
+                          <strong>{{ pk.deviceName }}</strong>
+                          <span class="passkey-meta">{{ t('dashboard.security.passkey.addedOn') }}: {{ formatDate(pk.createdAt) }} &bull; {{ t('dashboard.security.passkey.lastUsed') }} {{ formatDate(pk.lastUsedAt) }}</span>
+                       </div>
+                       <button class="btn btn-text" style="color: var(--md-error); padding: 8px;" @click="removePasskey(pk.id)">
+                           {{ t('dashboard.security.passkey.remove') }}
+                       </button>
+                    </div>
+                 </div>
+              </div>
             </div>
 
           </div>
@@ -444,6 +500,219 @@ const registerPasskey = async () => {
     <p>{{ t('dashboard.messages.loading') }}</p>
   </div>
 </template>
+
+<style scoped>
+/* Mevcut CSS Stillerini Koruyarak Yeni Liste Stilleri Ekledik */
+.dashboard-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 256px;
+  background-color: var(--md-surface);
+  border-right: 1px solid rgba(255,255,255,0.12);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 100;
+}
+
+.sidebar-header {
+  padding: 24px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.sidebar-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--md-primary);
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-nav a {
+  padding: 12px 24px;
+  color: var(--md-on-bg);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s, color 0.2s;
+}
+.sidebar-nav a:hover, .sidebar-nav a.active {
+  background-color: rgba(187, 134, 252, 0.12);
+  color: var(--md-primary);
+}
+
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.app-bar {
+  height: 64px;
+  background-color: var(--md-surface);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  box-shadow: 0 2px 4px -1px rgba(0,0,0,0.2), 0 4px 5px 0 rgba(0,0,0,0.14), 0 1px 10px 0 rgba(0,0,0,0.12);
+  z-index: 10;
+}
+
+.menu-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 12px;
+  margin-right: 16px;
+  display: none;
+}
+.menu-icon {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background-color: var(--md-on-bg);
+  position: relative;
+}
+.menu-icon::before, .menu-icon::after {
+  content: '';
+  position: absolute;
+  width: 24px;
+  height: 2px;
+  background-color: var(--md-on-bg);
+  left: 0;
+}
+.menu-icon::before { top: -6px; }
+.menu-icon::after { top: 6px; }
+
+.app-bar-title {
+  font-size: 20px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--md-secondary);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.content-wrapper {
+  padding: 32px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.stat-card {
+  margin: 0;
+  max-width: none;
+}
+
+.settings-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.settings-card {
+  flex: 1;
+  min-width: 300px;
+  max-width: 450px;
+  margin: 0;
+}
+.settings-card h3 {
+  margin-top: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+}
+
+.disabled-form {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* NEW: Passkey List Styles */
+.passkey-list {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.passkey-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.passkey-item:last-child {
+  border-bottom: none;
+}
+
+.passkey-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.passkey-info strong {
+  font-weight: 500;
+  margin-bottom: 4px;
+  color: var(--md-on-bg);
+}
+
+.passkey-meta {
+  font-size: 12px;
+  color: var(--md-on-bg-medium);
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+  }
+  .sidebar.is-open {
+    transform: translateX(0);
+  }
+  .menu-btn {
+    display: block;
+  }
+  .overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 50;
+  }
+}
+</style>
 
 <style scoped>
 .dashboard-layout {

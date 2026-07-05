@@ -1,6 +1,6 @@
 import { H3Event } from 'h3';
 import { db } from '../db';
-import { users } from '../db/schema';
+import { users, securitySettings } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
 export const requireUser = async (event: H3Event) => {
@@ -10,11 +10,21 @@ export const requireUser = async (event: H3Event) => {
     throw createError({ statusCode: 401, message: 'Unauthorized' });
   }
 
-  const [user] = await db.select().from(users).where(eq(users.id, userContext.userId)).limit(1);
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userContext.userId),
+    with: {
+        securitySettings: true
+    }
+  });
 
   if (!user) {
     throw createError({ statusCode: 401, message: 'User not found' });
   }
 
-  return user;
+  // Flatten the fields for easier backwards compatibility mapping across old usages
+  return {
+      ...user,
+      twoFactorEnabled: user.securitySettings?.twoFactorEnabled || false,
+      twoFactorSecret: user.securitySettings?.twoFactorSecret || null,
+  };
 };

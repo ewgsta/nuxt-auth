@@ -1,5 +1,5 @@
-import { db } from '../../../server/db';
-import { users } from '../../../server/db/schema';
+import { db } from '../../db';
+import { users, authTokens } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
@@ -7,31 +7,35 @@ export default defineEventHandler(async (event) => {
   const token = query.token as string;
 
   if (!token) {
-    return sendRedirect(event, '/login?error=invalid_token');
+    return sendRedirect(event, '/login?error=InvalidToken');
   }
 
   try {
-    const user = await db.query.users.findFirst({
-      where: eq(users.verificationToken, token)
+    const tokenRecord = await db.query.authTokens.findFirst({
+      where: eq(authTokens.verificationToken, token)
     });
 
-    if (!user) {
-      return sendRedirect(event, '/login?error=token_not_found');
+    if (!tokenRecord) {
+      return sendRedirect(event, '/login?error=InvalidToken');
     }
 
-    // Kullanıcıyı aktif hale getir
+    // Verify user
     await db.update(users)
       .set({ 
         isActive: true, 
-        emailVerifiedAt: new Date(),
-        verificationToken: null // Token'ı tek kullanımlık yapmak için sıfırlıyoruz
+        emailVerifiedAt: new Date() 
       })
-      .where(eq(users.id, user.id));
+      .where(eq(users.id, tokenRecord.userId));
 
-    // Doğrulama başarılı, giriş sayfasına yönlendir
+    // Clear verification token
+    await db.update(authTokens)
+      .set({
+        verificationToken: null
+      })
+      .where(eq(authTokens.id, tokenRecord.id));
+
     return sendRedirect(event, '/login?verified=true');
   } catch (error) {
-    console.error('Email verification error:', error);
-    return sendRedirect(event, '/login?error=server_error');
+    return sendRedirect(event, '/login?error=ServerError');
   }
 });

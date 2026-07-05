@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../../../db';
-import { users } from '../../../db/schema';
+import { securitySettings } from '../../../db/schema';
 import { requireUser } from '../../../utils/auth';
 import bcrypt from 'bcrypt';
 
@@ -22,7 +22,9 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'Invalid password' });
   }
 
-  await db.update(users).set({ twoFactorEnabled: false, twoFactorSecret: null }).where(eq(users.id, user.id));
+  await db.update(securitySettings)
+    .set({ twoFactorEnabled: false, twoFactorSecret: null })
+    .where(eq(securitySettings.userId, user.id));
 
   return { message: '2FA disabled successfully' };
 });

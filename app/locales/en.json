@@ -127,7 +127,13 @@
        "title": "Passkeys",
        "description": "Sign in securely with your fingerprint, face, or screen lock.",
        "add": "Add Passkey",
-       "adding": "Adding..."
+       "adding": "Adding...",
+       "listTitle": "Your Registered Passkeys",
+       "noPasskeys": "You don't have any passkeys registered yet.",
+       "addedOn": "Added on",
+       "remove": "Remove",
+       "removing": "Removing...",
+       "lastUsed": "Last used:"
       }
     },
     "settings": {

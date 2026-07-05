@@ -3,6 +3,7 @@ import { db } from '../../../db';
 import { passkeys, users } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
 import { signToken } from '../../../utils/jwt';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
 
 const rpID = process.env.URL ? new URL(process.env.URL).hostname : 'localhost';
 const origin = process.env.URL || `http://localhost:3000`;
@@ -23,7 +24,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Authenticator not registered' });
   }
 
-  const [user] = await db.select().from(users).where(eq(users.id, authenticator.userId)).limit(1);
+  const user = await db.query.users.findFirst({
+      where: eq(users.id, authenticator.userId)
+  });
 
   if (!user || !user.isActive) {
       throw createError({ statusCode: 403, statusMessage: 'Account is disabled or not verified.' });
@@ -36,9 +39,11 @@ export default defineEventHandler(async (event) => {
       expectedChallenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
-      authenticator: {
-        credentialID: Buffer.from(authenticator.credentialId, 'base64url'),
-        credentialPublicKey: Buffer.from(authenticator.credentialPublicKey, 'base64url'),
+      
+      // v13 Update: Expected argument is named "credential", NOT "authenticator" anymore!
+      credential: {
+        id: isoBase64URL.toBuffer(authenticator.credentialId),
+        publicKey: isoBase64URL.toBuffer(authenticator.credentialPublicKey),
         counter: Number(authenticator.counter) || 0,
         transports: authenticator.transports as any,
       },
@@ -49,7 +54,7 @@ export default defineEventHandler(async (event) => {
 
   const { verified, authenticationInfo } = verification;
 
-  if (verified) {
+  if (verified && authenticationInfo) {
     // Update counter
     await db.update(passkeys)
       .set({ 

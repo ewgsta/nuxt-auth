@@ -15,7 +15,9 @@ export default defineEventHandler(async (event) => {
   const options = await generateRegistrationOptions({
     rpName,
     rpID,
-    userID: user.id,
+    // WebAuthn v3/v13 gereği userID Uint8Array tipinde olmak zorundadır.
+    // Bunu string uuid olan user id'sinden dönüştürmeliyiz.
+    userID: new Uint8Array(Buffer.from(user.id)), 
     userName: user.email,
     attestationType: 'none',
     excludeCredentials: userPasskeys.map(passkey => ({

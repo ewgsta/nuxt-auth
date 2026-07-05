@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
   const { identifier } = body;
 
-  let queryPasskeys = [];
+  let queryPasskeys: any[] = [];
   
   // If specific user login
   if (identifier) {
